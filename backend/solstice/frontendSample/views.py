@@ -10,9 +10,6 @@ class VideoUploadView(APIView):
     def post(self, request, format=None):
         video = request.FILES.get('video')
         if video:
-            # Save the video or process as needed
-            with open(f'media/{video.name}', 'wb+') as destination:
-                for chunk in video.chunks():
-                    destination.write(chunk)
+            print("done1")
             return Response({'message': 'Video uploaded'}, status=status.HTTP_201_CREATED)
         return Response({'error': 'No video uploaded'}, status=status.HTTP_400_BAD_REQUEST)

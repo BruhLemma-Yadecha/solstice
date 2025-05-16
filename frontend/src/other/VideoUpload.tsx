@@ -19,10 +19,12 @@ const VideoUpload = ({ onUploadComplete }: VideoUploadProps) => {
     const formData = new FormData();
     formData.append("video", video);
 
-    await fetch("http://127.0.0.1:8000/upload/", {
+    const response = await fetch("http://127.0.0.1:8000/upload/", {
       method: "POST",
       body: formData,
     });
+    
+    console.log(response)
     onUploadComplete();
   };
 
