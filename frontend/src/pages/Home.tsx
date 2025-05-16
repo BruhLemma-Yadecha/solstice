@@ -1,9 +1,9 @@
 import { useNavigate, Link } from "react-router-dom";
 import React, { useState, useEffect } from "react";
-import CameraPose from "../other/CameraPose";
+import VideoUpload from "../other/VideoUpload";
+import { Lab } from "./Lab";
 
 const Home = () => {
-
   const [isUFile, setisUFile] = useState(true);
 
   return (
@@ -11,7 +11,7 @@ const Home = () => {
         <div>
             <p>Home</p>
         </div>
-        { isUFile ? (<div>UFile is true</div>) : (<div>UFile is false</div>) }
+        { isUFile ? (<VideoUpload onUploadComplete={() => setisUFile(false)} />) : (<Lab />) }
     </>
   )
 };
