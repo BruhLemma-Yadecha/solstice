@@ -16,9 +16,9 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
-from .frontendSample import views
+from .frontendSample.views import VideoUploadView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('upload/', views.VideoUploadView().as_view(), name='video-upload'),
+    path('upload/', VideoUploadView.as_view(), name='video-upload'),
 ]
