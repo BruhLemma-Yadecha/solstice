@@ -1,14 +1,13 @@
 // VideoUpload.tsx
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import "./VideoUpload.css"; // Import the CSS file
+import "../css/VideoUpload.css";
 
-type VideoUploadProps = {
-  onUploadComplete: () => void;
-};
-
-const VideoUpload = ({ onUploadComplete }: VideoUploadProps) => {
+const VideoUpload = () => {
   const [video, setVideo] = useState<File | null>(null);
+  const [option, setOption] = useState<string>("option1");
+  const navigate = useNavigate();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -16,10 +15,15 @@ const VideoUpload = ({ onUploadComplete }: VideoUploadProps) => {
     }
   };
 
+  const handleOptionChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setOption(e.target.value);
+  };
+
   const handleUpload = async () => {
     if (!video) return;
     const formData = new FormData();
     formData.append("video", video);
+    formData.append("option", option);
 
     const response = await fetch("http://127.0.0.1:8000/upload/", {
       method: "POST",
@@ -27,7 +31,7 @@ const VideoUpload = ({ onUploadComplete }: VideoUploadProps) => {
     });
 
     console.log(response);
-    onUploadComplete();
+    navigate("/lab");
   };
 
   return (
@@ -42,14 +46,27 @@ const VideoUpload = ({ onUploadComplete }: VideoUploadProps) => {
         whileHover={{ scale: 1.05, boxShadow: "0 4px 24px #00bcd4" }}
         whileTap={{ scale: 0.98 }}
       >
-        <input
+        <motion.input
           type="file"
           accept="video/*"
           onChange={handleChange}
           className="video-upload-input"
+          style={{ display: "none" }}
+          whileFocus={{ scale: 1.03, borderColor: "#1976d2" }}
         />
         {video ? video.name : "Choose a video"}
       </motion.label>
+      <motion.select
+        className="video-upload-select"
+        value={option}
+        onChange={handleOptionChange}
+        whileFocus={{ scale: 1.03, borderColor: "#1976d2" }}
+        whileHover={{ scale: 1.04, borderColor: "#42a5f5" }}
+      >
+        <option value="option1">Option 1</option>
+        <option value="option2">Option 2</option>
+        <option value="option3">Option 3</option>
+      </motion.select>
       <motion.button
         className="video-upload-btn"
         onClick={handleUpload}

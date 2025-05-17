@@ -1,0 +1,75 @@
+.lab-container {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #0d1b2a 0%, #1b263b 100%);
+  color: #e0f7fa;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding-top: 3rem;
+}
+
+.lab-title {
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 2rem;
+  color: #90caf9;
+  letter-spacing: 1px;
+}
+
+.lab-videos-row {
+  display: flex;
+  gap: 3rem; /* Increased gap for larger videos */
+  margin-bottom: 2rem;
+}
+
+.lab-video {
+  width: auto;
+  height:60vh;
+  border-radius: 1rem;
+  box-shadow: 0 2px 16px rgba(33, 150, 243, 0.12);
+  background: #1b263b;
+  border: 2px solid #1976d2;
+  object-fit: cover;
+}
+
+.lab-controls {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1rem;
+  background: #1b263b;
+  padding: 1rem 2rem;
+  border-radius: 1rem;
+  box-shadow: 0 2px 8px rgba(33, 150, 243, 0.08);
+}
+
+.lab-controls button {
+  background: #1976d2;
+  color: #e0f7fa;
+  border: none;
+  border-radius: 2rem;
+  padding: 0.5rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, box-shadow 0.2s;
+  box-shadow: 0 2px 8px rgba(33, 150, 243, 0.12);
+}
+
+.lab-controls button:hover {
+  background: #1565c0;
+}
+
+.lab-controls input[type="range"] {
+  width: 320px;
+  accent-color: #1976d2;
+  margin: 0 1rem;
+}
+
+.lab-controls span {
+  color: #90caf9;
+  font-size: 1rem;
+  min-width: 60px;
+  text-align: right;
+}
