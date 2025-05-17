@@ -1,0 +1,63 @@
+/* Reset some default browser styles */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  width: 100vw;
+}
+
+html, body, #root {
+  height: 100%;
+  font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+  background: linear-gradient(135deg, #e0f7fa 0%, #fff 100%);
+  color: #222;
+  scroll-behavior: smooth;
+}
+
+a {
+  color: #00bcd4;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+a:hover {
+  color: #0097a7;
+  text-decoration: underline;
+}
+
+button {
+  font-family: inherit;
+  font-size: 1rem;
+  border: none;
+  outline: none;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s, box-shadow 0.2s;
+}
+
+input, select, textarea {
+  font-family: inherit;
+  font-size: 1rem;
+  border-radius: 0.5rem;
+  border: 1px solid #b2ebf2;
+  padding: 0.5rem 1rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+input:focus, select:focus, textarea:focus {
+  border-color: #00bcd4;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  background: #e0f7fa;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #b2ebf2;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #00bcd4;
+}

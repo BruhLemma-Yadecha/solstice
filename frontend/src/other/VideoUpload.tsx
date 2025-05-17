@@ -1,5 +1,7 @@
 // VideoUpload.tsx
 import React, { useState } from "react";
+import { motion } from "framer-motion";
+import "./VideoUpload.css"; // Import the CSS file
 
 type VideoUploadProps = {
   onUploadComplete: () => void;
@@ -23,18 +25,46 @@ const VideoUpload = ({ onUploadComplete }: VideoUploadProps) => {
       method: "POST",
       body: formData,
     });
-    
-    console.log(response)
+
+    console.log(response);
     onUploadComplete();
   };
 
   return (
-    <div>
-      <input type="file" accept="video/*" onChange={handleChange} />
-      <button onClick={handleUpload} disabled={!video}>
+    <motion.div
+      className="video-upload-container"
+      initial={{ opacity: 0, y: 40 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.6, type: "spring" }}
+    >
+      <motion.label
+        className="video-upload-label"
+        whileHover={{ scale: 1.05, boxShadow: "0 4px 24px #00bcd4" }}
+        whileTap={{ scale: 0.98 }}
+      >
+        <input
+          type="file"
+          accept="video/*"
+          onChange={handleChange}
+          className="video-upload-input"
+        />
+        {video ? video.name : "Choose a video"}
+      </motion.label>
+      <motion.button
+        className="video-upload-btn"
+        onClick={handleUpload}
+        disabled={!video}
+        whileHover={{
+          scale: video ? 1.08 : 1,
+          backgroundColor: video ? "#00bcd4" : "#ccc",
+          color: "#fff",
+          boxShadow: video ? "0 4px 24px #00bcd4" : "none",
+        }}
+        whileTap={{ scale: 0.96 }}
+      >
         Upload Video
-      </button>
-    </div>
+      </motion.button>
+    </motion.div>
   );
 };
 
