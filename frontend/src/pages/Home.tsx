@@ -1,7 +1,7 @@
 import { useNavigate, Link } from "react-router-dom";
 import React, { useState } from "react";
 import { motion } from "framer-motion";
-import VideoUpload from "../other/VideoUpload";
+import VideoUpload from "./VideoUpload";
 import { Lab } from "./Lab";
 import "./Home.css";
 
@@ -31,7 +31,7 @@ const Home = () => {
         transition={{ delay: 0.4, duration: 0.5 }}
       >
         {isUFile ? (
-          <VideoUpload onUploadComplete={() => setisUFile(false)} />
+          <VideoUpload/>
         ) : (
           <Lab />
         )}
