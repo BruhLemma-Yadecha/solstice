@@ -1,0 +1,36 @@
+# views.py
+import os
+from django.conf import settings
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.parsers import MultiPartParser
+from rest_framework import status
+
+class VideoUploadView(APIView):
+    parser_classes = [MultiPartParser]
+
+    def post(self, request, format=None):
+        video = request.FILES.get('video')
+        option = request.data.get('option')  # Get the option from the form data
+        print("Received option:", option)    # Print the option to the console
+        if video:
+            save_path = os.path.join(settings.MEDIA_ROOT, video.name)
+            with open(save_path, 'wb+') as destination:
+                for chunk in video.chunks():
+                    destination.write(chunk)
+            return Response({'message': 'Video uploaded', 'option': option}, status=status.HTTP_201_CREATED)
+        return Response({'error': 'No video uploaded'}, status=status.HTTP_400_BAD_REQUEST)
+
+class VideoListView(APIView):
+    def get(self, request, format=None):
+        video_dir = settings.MEDIA_ROOT
+        videos = sorted(
+            [f for f in os.listdir(video_dir) if f.endswith(('.mp4', '.webm', '.ogg'))],
+            key=lambda x: os.path.getmtime(os.path.join(video_dir, x))
+        )
+        video_url = request.build_absolute_uri(settings.MEDIA_URL + videos[-1]) if videos else ""
+        return Response({
+            "video1": video_url,
+            "video2": video_url
+        })
+    

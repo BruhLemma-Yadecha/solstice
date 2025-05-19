@@ -31,6 +31,7 @@
   background: #1b263b;
   border: 2px solid #1976d2;
   object-fit: cover;
+  min-width: 400px;
 }
 
 .lab-controls {
@@ -72,4 +73,26 @@
   font-size: 1rem;
   min-width: 60px;
   text-align: right;
+}
+
+@media (max-width: 700px) {
+  .lab-videos-row {
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .lab-video {
+    min-width: 100px;
+  }
+
+  .lab-controls {
+    scale: .8;
+  }
+}
+
+@media (max-width: 500px) {
+  .lab-controls{
+    scale: .6;
+  }
 }

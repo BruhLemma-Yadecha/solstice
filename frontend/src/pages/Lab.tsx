@@ -29,7 +29,8 @@ export const Lab = () => {
             .then(data => {
                 const urls = [];
                 if (data.video1) urls.push(data.video1);
-                if (data.video2) urls.push(data.video2);
+                if (data.video2) urls.push(data.video1);
+                console.log(data.video2);
                 setVideoUrls(urls);
             });
     }, []);
@@ -120,6 +121,7 @@ export const Lab = () => {
                         onTimeUpdate={handleTimeUpdate}
                         onLoadedMetadata={handleLoadedMetadata}
                         controls={false}
+                        loop={true}
                         className="lab-video"
                         initial={{ opacity: 0, y: 30 }}
                         animate={{ opacity: 1, y: 0 }}
