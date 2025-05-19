@@ -111,11 +111,8 @@ def get_pose_data_upload_path(instance, filename):
     Filename will be <job_id>_posedata_v<version>.csv.
     """
     job_id = instance.id if instance.id else uuid.uuid4()
-    version = (
-        instance.pose_extraction_version if instance.pose_extraction_version else "1"
-    )
     # The 'filename' argument might be the original, but we enforce our own.
-    new_filename = f"{job_id}_posedata_v{version}.csv"
+    new_filename = f"{job_id}_posedata.csv"
     return os.path.join("intermediate_data", "pose_csvs", new_filename)
 
 
@@ -195,7 +192,11 @@ class VideoJob(models.Model):
     updated_at = models.DateTimeField(
         auto_now=True, help_text="Timestamp when the job was last updated."
     )
-
+    error_message = models.TextField(
+        null=True,
+        blank=True,
+        help_text="Error message captured if the processing job fails or encounters an issue."
+    )
     celery_pose_task_id = models.CharField(
         max_length=255,
         null=True,
@@ -216,4 +217,3 @@ class VideoJob(models.Model):
         ordering = ["-created_at"]
         verbose_name = "Video Job"
         verbose_name_plural = "Video Jobs"
-

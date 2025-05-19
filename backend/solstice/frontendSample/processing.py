@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import os
 import sys
-import argparse # Import the argparse module
+import argparse  # Import the argparse module
 
 # --- 1. Initialize MediaPipe PoseLandmarker ---
 mp_pose = mp.solutions.pose
@@ -16,13 +16,15 @@ BaseOptions = mp.tasks.BaseOptions
 # --- IMPORTANT: Download the model file first ---
 # Download from: https://developers.google.com/mediapipe/solutions/vision/pose_landmarker/index#models
 # Example: 'pose_landmarker_heavy.task'
-model_file_name = 'pose_landmarker_heavy.task' # Or lite, full, etc.
+model_file_name = "pose_landmarker_heavy.task"  # Or lite, full, etc.
 
 # Check if the model file exists
 if not os.path.exists(model_file_name):
     print(f"Error: Model file '{model_file_name}' not found.")
-    print(f"Please download it from https://developers.google.com/mediapipe/solutions/vision/pose_landmarker/index#models and place it in the same directory as the script, or provide the full path.")
-    sys.exit(1) # Use sys.exit for clean exit on error
+    print(
+        f"Please download it from https://developers.google.com/mediapipe/solutions/vision/pose_landmarker/index#models and place it in the same directory as the script, or provide the full path."
+    )
+    sys.exit(1)  # Use sys.exit for clean exit on error
 
 options = PoseLandmarkerOptions(
     base_options=BaseOptions(model_asset_path=model_file_name),
@@ -31,7 +33,7 @@ options = PoseLandmarkerOptions(
     min_pose_detection_confidence=0.5,
     min_pose_presence_confidence=0.5,
     min_tracking_confidence=0.5,
-    output_segmentation_masks=False
+    output_segmentation_masks=False,
 )
 
 # Create the landmarker
@@ -39,12 +41,16 @@ try:
     landmarker = PoseLandmarker.create_from_options(options)
 except Exception as e:
     print(f"Error creating PoseLandmarker: {e}")
-    sys.exit(1) # Use sys.exit for clean exit on error
+    sys.exit(1)  # Use sys.exit for clean exit on error
 
 # --- Command-line Argument Parsing ---
-parser = argparse.ArgumentParser(description='Process a video file to extract MediaPipe pose landmarks.')
-parser.add_argument('video_path', help='Path to the input video file.') # Define the command-line argument
-args = parser.parse_args() # Parse the arguments
+parser = argparse.ArgumentParser(
+    description="Process a video file to extract MediaPipe pose landmarks."
+)
+parser.add_argument(
+    "video_path", help="Path to the input video file."
+)  # Define the command-line argument
+args = parser.parse_args()  # Parse the arguments
 
 # Use the video path from the command-line arguments
 video_path = args.video_path
@@ -52,13 +58,13 @@ video_path = args.video_path
 # --- 2. Open Video File ---
 if not os.path.exists(video_path):
     print(f"Error: Video file '{video_path}' not found.")
-    sys.exit(1) # Use sys.exit for clean exit on error
+    sys.exit(1)  # Use sys.exit for clean exit on error
 
 cap = cv2.VideoCapture(video_path)
 
 if not cap.isOpened():
     print(f"Error: Could not open video {video_path}")
-    sys.exit(1) # Use sys.exit for clean exit on error
+    sys.exit(1)  # Use sys.exit for clean exit on error
 
 # --- 3. Process Video and Extract Positional Data ---
 all_pose_positions = []  # List to store positional data for all frames
@@ -79,26 +85,31 @@ while cap.isOpened():
 
     # Perform pose landmarking on the frame.
     try:
-        pose_landmarker_result = landmarker.detect_for_video(mp_image, frame_timestamp_ms)
+        pose_landmarker_result = landmarker.detect_for_video(
+            mp_image, frame_timestamp_ms
+        )
     except Exception as e:
         print(f"Error during landmark detection on frame {frame_number}: {e}")
         frame_number += 1
-        continue # Skip to next frame
+        continue  # Skip to next frame
 
     if pose_landmarker_result.pose_landmarks:
-        for person_landmarks in pose_landmarker_result.pose_landmarks: # Loop through each detected person
+        for (
+            person_landmarks
+        ) in pose_landmarker_result.pose_landmarks:  # Loop through each detected person
             # For simplicity, if num_poses > 1, you might want to add a 'person_id' column
-            frame_data = {'frame': frame_number, 'timestamp_ms': frame_timestamp_ms}
+            frame_data = {"frame": frame_number, "timestamp_ms": frame_timestamp_ms}
             for i, landmark in enumerate(person_landmarks):
-                frame_data[f'landmark_{i}_x'] = landmark.x
-                frame_data[f'landmark_{i}_y'] = landmark.y
-                frame_data[f'landmark_{i}_z'] = landmark.z
+                frame_data[f"landmark_{i}_x"] = landmark.x
+                frame_data[f"landmark_{i}_y"] = landmark.y
+                frame_data[f"landmark_{i}_z"] = landmark.z
             all_pose_positions.append(frame_data)
     else:
         # Optionally, record frames where no poses were detected
         # You might want to add None or NaN for landmark data in these frames
-        all_pose_positions.append({'frame': frame_number, 'timestamp_ms': frame_timestamp_ms})
-
+        all_pose_positions.append(
+            {"frame": frame_number, "timestamp_ms": frame_timestamp_ms}
+        )
 
     # Optional: Display progress (e.g., every 100 frames)
     if frame_number % 100 == 0:
@@ -162,17 +173,19 @@ if all_pose_positions:
     df_pose_positions = pd.DataFrame(all_pose_positions)
 
     # Ensure 'frame' and 'timestamp_ms' are the first columns
-    cols_to_front = ['frame', 'timestamp_ms']
+    cols_to_front = ["frame", "timestamp_ms"]
     other_cols = [col for col in df_pose_positions.columns if col not in cols_to_front]
     # Filter out empty columns if no landmarks were found in some frames
-    other_cols = [col for col in other_cols if not df_pose_positions[col].isnull().all()]
+    other_cols = [
+        col for col in other_cols if not df_pose_positions[col].isnull().all()
+    ]
 
     df_pose_positions = df_pose_positions[cols_to_front + other_cols]
 
     # Save to CSV
     # Generate output filename based on input video name
     base_name = os.path.splitext(os.path.basename(video_path))[0]
-    output_csv_path = f'{base_name}_pose_positions_timeseries.csv'
+    output_csv_path = f"{base_name}_pose_positions_timeseries.csv"
 
     df_pose_positions.to_csv(output_csv_path, index=False)
     print(f"Pose positional data saved to {output_csv_path}")

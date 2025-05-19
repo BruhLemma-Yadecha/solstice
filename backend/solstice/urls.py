@@ -16,13 +16,14 @@ Including another URLconf
 """
 
 from django.contrib import admin
-from django.urls import path
+from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
-from .frontendSample.views import VideoUploadView, VideoListView
+# from .frontendSample.views import VideoUploadView, VideoListView
 
 urlpatterns = [
-    path("admin/", admin.site.urls),
-    path("upload/", VideoUploadView.as_view(), name="video-upload"),
-    path("videos/", VideoListView.as_view(), name="video-list"),
+    # path("admin/", admin.site.urls),
+    # path("upload/", VideoUploadView.as_view(), name="video-upload"),
+    # path("videos/", VideoListView.as_view(), name="video-list"),
+    path('video/', include('apps.video_processing.urls', namespace='video_processing')),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

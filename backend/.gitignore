@@ -1,4 +1,8 @@
 __pycache__
 
+*.rdb
+*.sqlite3
+
+
 media/**/*
 !media/**/
