@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
+import Papa from "papaparse";
 import "../css/Lab.css";
 
-// Format seconds as mm:ss
 const formatTime = (seconds: number) => {
     if (!isFinite(seconds)) return "--:--";
     const m = Math.floor(seconds / 60);
@@ -10,8 +10,12 @@ const formatTime = (seconds: number) => {
     return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
 };
 
+type FramePoints = { [frame: string]: { x: number; y: number }[] };
+
 export const Lab = () => {
-    const [videoUrls, setVideoUrls] = useState<string[]>([]);
+    const [videoUrl, setVideoUrl] = useState<string>("");
+    const [csvUrl, setCsvUrl] = useState<string>("");
+    const [frames, setFrames] = useState<FramePoints>({});
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(0);
@@ -19,31 +23,77 @@ export const Lab = () => {
     const [startTime, setStartTime] = useState(0);
     const [endTime, setEndTime] = useState(0);
 
-    const videoRef1 = useRef<HTMLVideoElement>(null);
-    const videoRef2 = useRef<HTMLVideoElement>(null);
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const canvasRef = useRef<HTMLCanvasElement>(null);
 
-    // Fetch video URLs
+    // Fetch video and CSV URLs
     useEffect(() => {
-        fetch("http://127.0.0.1:8000/videos/")
+        fetch("http://127.0.0.1:8000/video/latest/")
             .then(res => res.json())
             .then(data => {
-                const urls = [];
-                if (data.video1) urls.push(data.video1);
-                if (data.video2) urls.push(data.video1);
-                console.log(data.video2);
-                setVideoUrls(urls);
+                if (data.video1) setVideoUrl(data.video1);
+                if (data.csv_url) setCsvUrl(data.csv_url); // Adjust this key to match your backend response
             });
     }, []);
 
-    // Play/Pause videos in sync
+    // Fetch and parse CSV
+    useEffect(() => {
+        if (!csvUrl) return;
+        fetch(csvUrl)
+            .then(res => res.text())
+            .then(csvText => {
+                Papa.parse(csvText, {
+                    header: true,
+                    complete: (results: Papa.ParseResult<any>) => {
+                        const grouped: FramePoints = {};
+                        (results.data as any[]).forEach((row: any) => {
+                            const frame = row.frame;
+                            const points: { x: number; y: number }[] = [];
+                            Object.keys(row).forEach((key) => {
+                                if (key.endsWith("_x")) {
+                                    const idx = key.replace("landmark_", "").replace("_x", "");
+                                    const yKey = `landmark_${idx}_y`;
+                                    if (row[key] && row[yKey]) {
+                                        points.push({ x: parseFloat(row[key]), y: parseFloat(row[yKey]) });
+                                    }
+                                }
+                            });
+                            if (points.length) grouped[frame] = points;
+                        });
+                        setFrames(grouped);
+                    }
+                });
+            });
+    }, [csvUrl]);
+
+    // Draw points for the current frame
+    useEffect(() => {
+        if (!canvasRef.current || !videoRef.current) return;
+        const canvas = canvasRef.current;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Find the closest frame to the current video time
+        const fps = 30; // or get from video metadata
+        const frameIdx = Math.round(currentTime * fps);
+        const points = frames[frameIdx] || [];
+
+        ctx.fillStyle = "#00bcd4";
+        points.forEach(pt => {
+            ctx.beginPath();
+            ctx.arc(pt.x * canvas.width, pt.y * canvas.height, 5, 0, 2 * Math.PI);
+            ctx.fill();
+        });
+    }, [currentTime, frames]);
+
+    // Play/Pause video
     useEffect(() => {
         if (videosReady) {
             if (isPlaying) {
-                videoRef1.current?.play();
-                videoRef2.current?.play();
+                videoRef.current?.play();
             } else {
-                videoRef1.current?.pause();
-                videoRef2.current?.pause();
+                videoRef.current?.pause();
             }
         }
     }, [isPlaying, videosReady]);
@@ -51,43 +101,34 @@ export const Lab = () => {
     // Sync currentTime on state update
     useEffect(() => {
         if (!videosReady) return;
-        if (videoRef1.current && Math.abs(videoRef1.current.currentTime - currentTime) > 0.1) {
-            videoRef1.current.currentTime = currentTime;
-        }
-        if (videoRef2.current && Math.abs(videoRef2.current.currentTime - currentTime) > 0.1) {
-            videoRef2.current.currentTime = currentTime;
+        if (videoRef.current && Math.abs(videoRef.current.currentTime - currentTime) > 0.1) {
+            videoRef.current.currentTime = currentTime;
         }
     }, [currentTime, videosReady]);
 
     // Handle metadata loaded
     const handleLoadedMetadata = () => {
-        if (videoRef1.current && videoRef2.current) {
-            const minDuration = Math.min(
-                videoRef1.current.duration || 0,
-                videoRef2.current.duration || 0
-            );
-            setDuration(minDuration);
+        if (videoRef.current) {
+            const dur = videoRef.current.duration || 0;
+            setDuration(dur);
             setStartTime(0);
-            setEndTime(minDuration);
+            setEndTime(dur);
             setVideosReady(true);
         }
     };
 
-    // Update current time when videos play
+    // Update current time when video plays
     const handleTimeUpdate = () => {
         if (!videosReady) return;
-        if (videoRef1.current && videoRef2.current) {
-            const t1 = videoRef1.current.currentTime;
-            const t2 = videoRef2.current.currentTime;
-            setCurrentTime((t1 + t2) / 2);
+        if (videoRef.current) {
+            setCurrentTime(videoRef.current.currentTime);
         }
     };
 
     // Handle user seek
     const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
         const time = Number(e.target.value);
-        if (videoRef1.current) videoRef1.current.currentTime = time;
-        if (videoRef2.current) videoRef2.current.currentTime = time;
+        if (videoRef.current) videoRef.current.currentTime = time;
         setCurrentTime(time);
     };
 
@@ -112,23 +153,29 @@ export const Lab = () => {
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: 0.3, duration: 0.6 }}
+                style={{ display: "flex", gap: "2rem", justifyContent: "center" }}
             >
-                {videoUrls.map((url, idx) => (
-                    <motion.video
-                        key={idx}
-                        ref={idx === 0 ? videoRef1 : videoRef2}
-                        src={url}
-                        onTimeUpdate={handleTimeUpdate}
-                        onLoadedMetadata={handleLoadedMetadata}
-                        controls={false}
-                        loop={true}
-                        className="lab-video"
-                        initial={{ opacity: 0, y: 30 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.4 + idx * 0.1, duration: 0.5 }}
-                        whileHover={{ scale: 1.03, boxShadow: "0 4px 32px #1976d2" }}
-                    />
-                ))}
+                <motion.video
+                    ref={videoRef}
+                    src={videoUrl}
+                    onTimeUpdate={handleTimeUpdate}
+                    onLoadedMetadata={handleLoadedMetadata}
+                    controls={false}
+                    loop={true}
+                    className="lab-video"
+                    initial={{ opacity: 0, y: 30 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.4, duration: 0.5 }}
+                    whileHover={{ scale: 1.03, boxShadow: "0 4px 32px #1976d2" }}
+                    width={400}
+                    height={300}
+                />
+                <canvas
+                    ref={canvasRef}
+                    width={400}
+                    height={300}
+                    style={{ background: "#222", borderRadius: "1rem" }}
+                />
             </motion.div>
 
             <motion.div

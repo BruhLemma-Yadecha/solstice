@@ -142,3 +142,24 @@ class JobStatusAPIView(APIView):
         serializer = VideoJobDetailSerializer(job, context={'request': request})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+class LatestVideoAndCSVAPIView(APIView):
+    """
+    API View to get the latest processed video and its pose CSV.
+    """
+    def get(self, request, *args, **kwargs):
+        # Find the latest VideoJob with a completed pose CSV
+        latest_job = (
+            VideoJob.objects
+            .filter(pose_data_file__isnull=False)
+            .order_by('-created_at')
+            .first()
+        )
+        if not latest_job or not latest_job.pose_data_file:
+            return Response({"detail": "No processed video and CSV found."}, status=status.HTTP_404_NOT_FOUND)
+
+        video_url = request.build_absolute_uri(latest_job.input_video.file.url)
+        csv_url = request.build_absolute_uri(latest_job.pose_data_file.url)
+        return Response({
+            "video1": video_url,
+            "csv_url": csv_url
+        }, status=status.HTTP_200_OK)

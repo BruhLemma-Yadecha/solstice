@@ -6,7 +6,7 @@ import "../css/VideoUpload.css";
 
 const VideoUpload = () => {
   const [video, setVideo] = useState<File | null>(null);
-  const [option, setOption] = useState<string>("option1");
+  const [option, setOption] = useState<number>(1);
   const [upload, setUpload] = useState("Upload Video");
   const navigate = useNavigate();
 
@@ -17,17 +17,17 @@ const VideoUpload = () => {
   };
 
   const handleOptionChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setOption(e.target.value);
+    setOption(Number(e.target.value));
   };
 
   const handleUpload = async () => {
     if (!video) return;
     setUpload("Uploading...");
     const formData = new FormData();
-    formData.append("video", video);
-    formData.append("option", option);
+    formData.append("video_file", video);
+    formData.append("pose_algorithm_id", "1");
 
-    const response = await fetch("http://127.0.0.1:8000/upload/", {
+    const response = await fetch("http://127.0.0.1:8000/video/upload/", {
       method: "POST",
       body: formData,
     });
@@ -67,9 +67,9 @@ const VideoUpload = () => {
           whileFocus={{ scale: 1.03, borderColor: "#1976d2" }}
           whileHover={{ scale: 1.04, borderColor: "#42a5f5" }}
         >
-          <option value="alg1">Algorithm 1</option>
-          <option value="alg2">Algorithm 2</option>
-          <option value="alg3">Algorithm 3</option>
+          <option value="1">Algorithm 1</option>
+          <option value="2">Algorithm 2</option>
+          <option value="3">Algorithm 3</option>
         </motion.select>
         <motion.button
           className="video-upload-btn"

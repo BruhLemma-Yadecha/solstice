@@ -33,4 +33,4 @@ class VideoListView(APIView):
             "video1": video_url,
             "video2": video_url
         })
-    
+
