@@ -8,11 +8,22 @@ ENV PYTHONUNBUFFERED 1
 # Set work directory
 WORKDIR /app
 
+# Install system dependencies required by OpenCV and other common libraries
+# It's good practice to install these before Python dependencies
+RUN apt-get update && apt-get install -y \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/*
+
 # Install Python dependencies
 # We copy only requirements.txt first to leverage Docker cache
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+
 # Add gunicorn if not in requirements.txt; it's a common production server for Django
+# This line assumes gunicorn might not be in requirements.txt.
+# If it is, this line might be redundant or could be used to ensure a specific version.
 RUN pip install --no-cache-dir gunicorn
 
 # Copy the rest of the application code
