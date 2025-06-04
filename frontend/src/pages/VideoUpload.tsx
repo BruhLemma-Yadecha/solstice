@@ -34,10 +34,10 @@ const VideoUpload = () => {
 
     const responseData = await response.json();
     console.log(responseData);
-    localStorage.setItem("video_job_id", responseData.job_id);
+    localStorage.setItem("video_job_id", responseData.id);
 
     setUpload("Uploaded");
-    navigate("/lab");
+    navigate("/status");
   };
 
   return (

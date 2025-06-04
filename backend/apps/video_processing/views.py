@@ -52,8 +52,9 @@ class VideoUploadAPIView(APIView):
 
         # 2. Try to find an existing video by hash
         try:
-            video_instance = Video.objects.get(file_hash=file_hash)
-            logger.info(f"Video with hash {file_hash} already exists (ID: {video_instance.id}). Reusing.")
+            # video_instance = Video.objects.get(file_hash=file_hash)
+            # logger.info(f"Video with hash {file_hash} already exists (ID: {video_instance.id}). Reusing.")
+            pass
         except Video.DoesNotExist:
             # 3. If not found, create a new Video instance
             # The VideoSerializer will handle passing the file to the Video model's save() method,

@@ -5,7 +5,6 @@ from .mediapipe import MEDIAPIPE_MODELS, run_mediapipe_on_video
 # Get an instance of a logger
 logger = logging.getLogger(__name__)
 
-
 def generate_pose_data_csv(video_file_path: str, algorithm_id: int) -> bytes:
     """
     Processes the video file using the specified pose estimation algorithm
@@ -33,20 +32,23 @@ def generate_pose_data_csv(video_file_path: str, algorithm_id: int) -> bytes:
 
     try:
         if algorithm_id == 1:
-            csv_bytes = run_mediapipe_on_video(
-                video_file_path, MEDIAPIPE_MODELS.POSE_LANDMARKER_LITE
-            )
+            selected_model = MEDIAPIPE_MODELS.POSE_LANDMARKER_LITE
         elif algorithm_id == 2:
-            csv_bytes = run_mediapipe_on_video(
-                video_file_path, MEDIAPIPE_MODELS.POSE_LANDMARKER_FULL
-            )
+            selected_model = MEDIAPIPE_MODELS.POSE_LANDMARKER_FULL
         elif algorithm_id == 3:
-            csv_bytes = run_mediapipe_on_video(
-                video_file_path, MEDIAPIPE_MODELS.POSE_LANDMARKER_HEAVY
-            )
+            selected_model = MEDIAPIPE_MODELS.POSE_LANDMARKER_HEAVY
         else:
             logger.error(f"Unknown pose estimation algorithm ID: {algorithm_id}")
             raise ValueError(f"Unknown pose estimation algorithm ID: {algorithm_id}")
+
+        csv_bytes = run_mediapipe_on_video(video_file_path, selected_model)
+
+        if not csv_bytes or csv_bytes.strip() == b"":
+            logger.warning(
+                f"No pose data extracted from video {video_file_path}. Returning placeholder CSV."
+            )
+            placeholder_csv = b"./placeholder.csv"
+            return placeholder_csv
 
         logger.info(
             f"Successfully generated pose data CSV for {video_file_path} using algorithm {algorithm_id}"
@@ -63,20 +65,3 @@ def generate_pose_data_csv(video_file_path: str, algorithm_id: int) -> bytes:
             exc_info=True,
         )
         raise Exception(f"Pose estimation failed for algorithm {algorithm_id}: {e}")
-
-
-# Example of how this might be called from your Celery task:
-#
-# from .models import VideoJob
-# from .services import pose_extraction
-#
-# def some_celery_task(job_id):
-#     job = VideoJob.objects.get(id=job_id)
-#     video_path = job.input_video.file.path # Assuming input_video is a ForeignKey to Video model
-#     algo_id = job.pose_algorithm_id
-#
-#     try:
-#         csv_data_bytes = pose_extraction.generate_pose_data_csv(video_path, algo_id)
-#         # ... then save csv_data_bytes to job.pose_data_file ...
-#     except Exception as e:
-#         # ... handle error ...

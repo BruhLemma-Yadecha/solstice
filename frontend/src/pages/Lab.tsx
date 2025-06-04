@@ -19,6 +19,7 @@ export const Lab = () => {
     const [frames, setFrames] = useState<FramePoints>({});
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentTime, setCurrentTime] = useState(0);
+    const [ex, setEx] = useState(0);
     const [videosReady, setVideosReady] = useState(false);
     const [startTime, setStartTime] = useState(0);
     const [endTime, setEndTime] = useState(0);
@@ -77,7 +78,7 @@ export const Lab = () => {
 
         // Find the closest frame to the current video time
         const fps = 30; // or get from video metadata
-        const frameIdx = Math.round(currentTime * fps);
+        const frameIdx = Math.round((currentTime-ex) * fps);
         const points = frames[frameIdx] || [];
 
         ctx.fillStyle = "#00bcd4";
@@ -105,7 +106,19 @@ export const Lab = () => {
         if (videoRef.current && Math.abs(videoRef.current.currentTime - currentTime) > 0.1) {
             videoRef.current.currentTime = currentTime;
         }
+        if (ex===0 && videoRef.current) {
+            setEx(currentTime); 
+        }
     }, [currentTime, videosReady]);
+
+    // Add this useEffect to sync currentTime when the user seeks using the video controls (if enabled)
+    useEffect(() => {
+        const video = videoRef.current;
+        if (!video) return;
+        const onSeeked = () => setCurrentTime(video.currentTime);
+        video.addEventListener("seeked", onSeeked);
+        return () => video.removeEventListener("seeked", onSeeked);
+    }, [videoRef]);
 
     // Handle metadata loaded
     const handleLoadedMetadata = () => {
@@ -128,6 +141,7 @@ export const Lab = () => {
     // Handle user seek
     const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
         const time = Number(e.target.value);
+        if (videoRef.current) videoRef.current.currentTime = time;
         setCurrentTime(time);
     };
 
@@ -204,8 +218,8 @@ export const Lab = () => {
 
                 <motion.input
                     type="range"
-                    min={startTime}
-                    max={endTime - 0.05} // avoid seeking to very end
+                    min={startTime+ex}
+                    max={endTime+ex} // avoid seeking to very end
                     value={currentTime}
                     onChange={handleSeek}
                     step={0.01}
@@ -218,7 +232,7 @@ export const Lab = () => {
                     animate={{ opacity: 1 }}
                     transition={{ delay: 0.7 }}
                 >
-                    {formatTime(currentTime)} / {formatTime(endTime)}
+                    {formatTime(currentTime)} / {formatTime(endTime+ex)}
                 </motion.span>
             </motion.div>
         </motion.div>
