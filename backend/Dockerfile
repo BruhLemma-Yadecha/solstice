@@ -38,3 +38,5 @@ EXPOSE 8000
 # The WEB_APP_CONTAINER_PORT environment variable (defaulting to 8000) is used here,
 # similar to how it's used in the docker-compose.yml command.
 CMD exec gunicorn --workers 3 --bind "0.0.0.0:${WEB_APP_CONTAINER_PORT:-8000}" solstice.wsgi:application
+
+RUN python manage.py migrate
