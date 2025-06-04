@@ -1,2 +1,4 @@
 dump.rdb
 backend/shell.nix
+
+.env

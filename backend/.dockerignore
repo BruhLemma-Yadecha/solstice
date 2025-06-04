@@ -1,0 +1,28 @@
+*.pyc
+__pycache__/
+.DS_Store
+.env
+*.sqlite3
+media/
+static/
+
+# Docker related
+Dockerfile
+docker-compose.yml
+
+# IDE / Editor specific
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Python virtual environment
+venv/
+.venv/
+env/
+
+# Celery beat schedule file
+celerybeat-schedule
+
+# Log files
+*.log

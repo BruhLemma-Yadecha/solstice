@@ -32,7 +32,10 @@ const VideoUpload = () => {
       body: formData,
     });
 
-    console.log(response);
+    const responseData = await response.json();
+    console.log(responseData);
+    localStorage.setItem("video_job_id", responseData.job_id);
+
     setUpload("Uploaded");
     navigate("/lab");
   };

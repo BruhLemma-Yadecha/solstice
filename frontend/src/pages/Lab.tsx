@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import Papa from "papaparse";
 import "../css/Lab.css";
@@ -18,10 +19,10 @@ export const Lab = () => {
     const [frames, setFrames] = useState<FramePoints>({});
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentTime, setCurrentTime] = useState(0);
-    const [duration, setDuration] = useState(0);
     const [videosReady, setVideosReady] = useState(false);
     const [startTime, setStartTime] = useState(0);
     const [endTime, setEndTime] = useState(0);
+    const navigate = useNavigate();
 
     const videoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -110,7 +111,6 @@ export const Lab = () => {
     const handleLoadedMetadata = () => {
         if (videoRef.current) {
             const dur = videoRef.current.duration || 0;
-            setDuration(dur);
             setStartTime(0);
             setEndTime(dur);
             setVideosReady(true);
@@ -128,7 +128,6 @@ export const Lab = () => {
     // Handle user seek
     const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
         const time = Number(e.target.value);
-        if (videoRef.current) videoRef.current.currentTime = time;
         setCurrentTime(time);
     };
 
@@ -139,6 +138,16 @@ export const Lab = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, type: "spring" }}
         >
+            <motion.button
+                className="back-button"
+                onClick={() => navigate("/")}
+                whileHover={{ scale: 1.05, boxShadow: "0 4px 24px #00bcd4" }}
+                whileTap={{ scale: 0.95 }}
+                style={{color: "#00bcd4", backgroundColor: "transparent", border: "none", cursor: "pointer"}}
+            >
+                Back
+            </motion.button>
+            
             <motion.h2
                 className="lab-title"
                 initial={{ opacity: 0, y: -20 }}
@@ -161,7 +170,8 @@ export const Lab = () => {
                     onTimeUpdate={handleTimeUpdate}
                     onLoadedMetadata={handleLoadedMetadata}
                     controls={false}
-                    loop={true}
+                    loop={false} // <-- changed
+                    onEnded={() => setIsPlaying(false)} // <-- add this
                     className="lab-video"
                     initial={{ opacity: 0, y: 30 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -195,7 +205,7 @@ export const Lab = () => {
                 <motion.input
                     type="range"
                     min={startTime}
-                    max={endTime}
+                    max={endTime - 0.05} // avoid seeking to very end
                     value={currentTime}
                     onChange={handleSeek}
                     step={0.01}
