@@ -85,3 +85,12 @@ body {
   background: #0d1b2a;
   color: #90caf9;
 }
+
+.video-upload-footer {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  margin: auto;
+  margin-top: 1rem;
+  align-items: center;
+}

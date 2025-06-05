@@ -75,6 +75,10 @@
   text-align: right;
 }
 
+.back-button:focus{
+  outline: none;
+}
+
 @media (max-width: 700px) {
   .lab-videos-row {
     flex-direction: column;

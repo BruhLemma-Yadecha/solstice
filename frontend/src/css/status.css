@@ -1,0 +1,17 @@
+.status-footer {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  margin: auto;
+  margin-top: 5rem;
+  align-items: center;
+
+}
+
+.status-container {
+    background: linear-gradient(135deg, #1b263b 0%, #0d1b2a 100%);
+    margin: auto;
+    width: 300px;
+    padding: 20px;
+    box-shadow: 0 2px 26px rgba(0, 92, 212, 0.618);
+}
