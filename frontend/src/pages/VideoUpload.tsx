@@ -62,7 +62,7 @@ const VideoUpload = () => {
               onChange={handleChange}
               className="video-upload-input"
               style={{ display: "none" }}
-              whileFocus={{ scale: 1.03, borderColor: "#1976d2" }}
+              whileFocus={{ scale: 1.03, borderColor: "#00bcd4" }}
             />
             {video ? video.name : "Choose a video"}
           </motion.label>
@@ -70,8 +70,8 @@ const VideoUpload = () => {
             className="video-upload-select"
             value={option}
             onChange={handleOptionChange}
-            whileFocus={{ scale: 1.03, borderColor: "#1976d2" }}
-            whileHover={{ scale: 1.04, borderColor: "#42a5f5" }}
+            whileFocus={{ scale: 1.03, borderColor: " #00bcd4" }}
+            whileHover={{ scale: 1.04, borderColor: " #00bcd4" }}
           >
             <option value="1">Algorithm 1</option>
             <option value="2">Algorithm 2</option>
@@ -83,7 +83,7 @@ const VideoUpload = () => {
             disabled={!video || upload==="Uploading..."}
             whileHover={{
               scale: video ? 1.08 : 1,
-              backgroundColor: video ? "#00bcd4" : "#ccc",
+              backgroundColor: video ? " #00bcd4" : " #ccc",
               color: "#fff",
               boxShadow: (video || !(upload==="Uploading...")) ? "0 4px 24px #00bcd4" : "none",
             }}
@@ -103,7 +103,7 @@ const VideoUpload = () => {
             onClick={() => setStatus(!status)}
             whileHover={{ scale: 1.05, boxShadow: "8px 8px #00bcd4", color: "#fff" }}
             whileTap={{ scale: 0.95, boxShadow: "4px 3px #00bcd4" }}
-            style={{ color: "#00bcd4", backgroundColor: "transparent", border: "none", cursor: "pointer", margin: "5rem", boxShadow: "0 2px 0px #00bcd4" }}
+            style={{ color: "#00bcd4", backgroundColor: "transparent", border: "none", cursor: "pointer", margin: "auto", boxShadow: "0 2px 0px #00bcd4" }}
         >
             Status
         </motion.button>

@@ -52,9 +52,8 @@ class VideoUploadAPIView(APIView):
 
         # 2. Try to find an existing video by hash
         try:
-            # video_instance = Video.objects.get(file_hash=file_hash)
-            # logger.info(f"Video with hash {file_hash} already exists (ID: {video_instance.id}). Reusing.")
-            pass
+            video_instance = Video.objects.get(file_hash=file_hash)
+            logger.info(f"Video with hash {file_hash} already exists (ID: {video_instance.id}). Reusing.")
         except Video.DoesNotExist:
             # 3. If not found, create a new Video instance
             # The VideoSerializer will handle passing the file to the Video model's save() method,
@@ -164,3 +163,43 @@ class LatestVideoAndCSVAPIView(APIView):
             "video1": video_url,
             "csv_url": csv_url
         }, status=status.HTTP_200_OK)
+
+#video deletion endpoint
+class VideoDeleteAPIView(APIView):
+    """
+    API View to delete a video and its associated jobs.
+    """
+    def delete(self, request, video_id, *args, **kwargs):
+        try:
+            video = Video.objects.get(id=video_id)
+        except Video.DoesNotExist:
+            logger.warning(f"Delete request for non-existent video_id: {video_id}")
+            return Response({"detail": "Video not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        # Delete all jobs associated with this video
+        VideoJob.objects.filter(input_video=video).delete()
+        logger.info(f"Deleted all jobs associated with video {video.id}")
+
+        # Delete the video file
+        video.delete()
+        logger.info(f"Video {video.id} deleted successfully")
+
+        return Response({"detail": "Video and associated jobs deleted successfully."}, status=status.HTTP_204_NO_CONTENT)
+
+#for regenerate the csv
+class VideoRegenerateCSVAPIView(APIView):
+    """
+    API View to regenerate the pose CSV for a specific video.
+    """
+    def post(self, request, video_id, *args, **kwargs):
+        try:
+            video = Video.objects.get(id=video_id)
+        except Video.DoesNotExist:
+            logger.warning(f"Regenerate CSV request for non-existent video_id: {video_id}")
+            return Response({"detail": "Video not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        # Trigger the regeneration of the CSV
+        video_to_pose_data_task.delay(video.id)
+        logger.info(f"Celery task video_to_pose_data_task dispatched for video {video.id}")
+
+        return Response({"detail": "CSV regeneration initiated."}, status=status.HTTP_202_ACCEPTED)

@@ -29,6 +29,13 @@ export const Lab = () => {
 
     const videoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
+    const [csvReloadKey, setCsvReloadKey] = useState(0);
+
+    // Extract videoId from videoUrl (assuming /media/videos_hashed/<uuid>.<ext>)
+    const videoId = (() => {
+        const match = videoUrl.match(/([0-9a-fA-F-]{8}-[0-9a-fA-F-]{4}-[0-9a-fA-F-]{4}-[0-9a-fA-F-]{4}-[0-9a-fA-F-]{12})/);
+        return match ? match[1] : null;
+    })();
 
     // Fetch video and CSV URLs
     useEffect(() => {
@@ -38,7 +45,7 @@ export const Lab = () => {
                 if (data.video1) setVideoUrl(data.video1);
                 if (data.csv_url) setCsvUrl(data.csv_url);
             });
-    }, []);
+    }, [csvReloadKey]);
 
     // Fetch and parse CSV into a mapping from frame number → 33-length array of {x,y} or null
     useEffect(() => {
@@ -217,6 +224,56 @@ export const Lab = () => {
         setCurrentTime(time);
     };
 
+    // Delete video handler
+    const handleDeleteVideo = () => {
+        if (!videoId) {
+            alert("No video ID found.");
+            return;
+        }
+        fetch(`http://127.0.0.1:8000/video/videos/${videoId}/delete/`, {
+            method: "DELETE",
+            headers: {
+                "Content-Type": "application/json",
+            },
+        })
+            .then((response) => {
+                if (response.ok) {
+                    alert("Video deleted successfully");
+                    navigate("/");
+                } else {
+                    alert("Error deleting video");
+                }
+            })
+            .catch((error) => {
+                alert("Error deleting video: " + error);
+            });
+    };
+
+    // Reload CSV handler
+    const handleReloadCSV = () => {
+        if (!videoId) {
+            alert("No video ID found.");
+            return;
+        }
+        fetch(`http://127.0.0.1:8000/video/videos/${videoId}/regenerate-csv/`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+        })
+            .then((response) => {
+                if (response.ok) {
+                    alert("CSV regeneration started. It may take a few seconds.");
+                    setCsvReloadKey(k => k + 1); // This will re-fetch the CSV when ready
+                } else {
+                    alert("Error regenerating CSV");
+                }
+            })
+            .catch((error) => {
+                alert("Error regenerating CSV: " + error);
+            });
+    };
+
     return (
         <motion.div
             className="lab-container"
@@ -253,7 +310,7 @@ export const Lab = () => {
                     initial={{ opacity: 0, y: 30 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.4, duration: 0.5 }}
-                    whileHover={{ scale: 1.03, boxShadow: "0 4px 32px #1976d2" }}
+                    whileHover={{ scale: 1.03, boxShadow: "0 4px 32px #00bcd4" }}
                     width={400}
                     height={300}
                 />
@@ -263,7 +320,7 @@ export const Lab = () => {
                     initial={{ opacity: 0, y: 30 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.4, duration: 0.5 }}
-                    whileHover={{ scale: 1.03, boxShadow: "0 4px 32px #1976d2" }}
+                    whileHover={{ scale: 1.03, boxShadow: "0 4px 32px #00bcd4" }}
                     width={400}
                     height={300}
                     style={{ background: "#222", borderRadius: "1rem" }}
@@ -278,12 +335,13 @@ export const Lab = () => {
             >
                 <motion.button
                     onClick={() => setIsPlaying(!isPlaying)}
-                    whileHover={{ scale: 1.08, backgroundColor: "#1565c0" }}
+                    whileHover={{ cursor: videosReady ? "pointer" : "not-allowed", backgroundColor: "#00bcd400", outline: "none", border: "2px solid #00bcd4", color: "#00bcd4", boxShadow: "none" }}
+                    whileFocus={{ cursor: videosReady ? "pointer" : "not-allowed", border: "2px solid #00bcd4", outline: "none" }}
                     whileTap={{ scale: 0.96 }}
+                    disabled={!videosReady}
                 >
                     {isPlaying ? "Pause" : "Play"}
-                </motion.button>
-
+                </motion.button>    
                 <motion.input
                     type="range"
                     min={startTime + ex}
@@ -293,6 +351,17 @@ export const Lab = () => {
                     step={0.01}
                     disabled={!videosReady}
                     whileFocus={{ scale: 1.03 }}
+                    style={{
+                        width: "320px",
+                        accentColor: "#00bcd4",
+                        background: "linear-gradient(90deg, #00bcd4 0%, #2196f3 100%)",
+                        borderRadius: "8px",
+                        outline: "none",
+                        margin: "0 1.5rem",
+                        cursor: videosReady ? "pointer" : "not-allowed",
+                        opacity: videosReady ? 1 : 0.5,
+                        transition: "box-shadow 0.2s, background 0.2s"
+                    }}
                 />
 
                 <motion.span
@@ -308,31 +377,40 @@ export const Lab = () => {
                 <button onClick={() => setStatus(!status)} style={{border: "none", background: "none", color: "#00bcd4", cursor: "pointer", right: "10px", boxShadow: "0 2px 26px rgba(0, 92, 212, 0.618)", backgroundColor: "transparent"}}>x</button>
                 <StatusPage/>
             </div>)}
-            <div>
+            <div style={{ display: "flex", gap: "2rem", justifyContent: "center", margin: "2rem 0" }}>
                 <motion.button
                     className="back-button"
                     onClick={() => navigate("/")}
                     whileHover={{ scale: 1.05, boxShadow: "8px 8px #00bcd4", color: "#fff" }}
                     whileTap={{ scale: 0.95, boxShadow: "4px 3px #00bcd4" }}
-                    style={{ color: "#00bcd4", backgroundColor: "transparent", border: "none", cursor: "pointer", margin: "5rem", boxShadow: "0 2px 0px #00bcd4" }}
+                    style={{ color: "#00bcd4", backgroundColor: "transparent", border: "none", cursor: "pointer", boxShadow: "0 2px 0px #00bcd4" }}
                 >
                     Back
                 </motion.button>
                 <motion.button
                     className="back-button"
-                    onClick={() => window.location.reload()}
+                    onClick={handleDeleteVideo}
                     whileHover={{ scale: 1.05, boxShadow: "8px 8px #00bcd4", color: "#fff" }}
                     whileTap={{ scale: 0.95, boxShadow: "4px 3px #00bcd4" }}
-                    style={{ color: "#00bcd4", backgroundColor: "transparent", border: "none", cursor: "pointer", margin: "5rem", boxShadow: "0 2px 0px #00bcd4" }}
+                    style={{ color: "#00bcd4", backgroundColor: "transparent", border: "none", cursor: "pointer", boxShadow: "0 2px 0px #00bcd4" }}
                 >
-                    Reload
+                    Delete Video
+                </motion.button>
+                <motion.button
+                    className="back-button"
+                    onClick={handleReloadCSV}
+                    whileHover={{ scale: 1.05, boxShadow: "8px 8px #00bcd4", color: "#fff" }}
+                    whileTap={{ scale: 0.95, boxShadow: "4px 3px #00bcd4" }}
+                    style={{ color: "#00bcd4", backgroundColor: "transparent", border: "none", cursor: "pointer", boxShadow: "0 2px 0px #00bcd4" }}
+                >
+                    Reload CSV
                 </motion.button>
                 <motion.button
                     className="back-button"
                     onClick={() => setStatus(!status)}
                     whileHover={{ scale: 1.05, boxShadow: "8px 8px #00bcd4", color: "#fff" }}
                     whileTap={{ scale: 0.95, boxShadow: "4px 3px #00bcd4" }}
-                    style={{ color: "#00bcd4", backgroundColor: "transparent", border: "none", cursor: "pointer", margin: "5rem", boxShadow: "0 2px 0px #00bcd4" }}
+                    style={{ color: "#00bcd4", backgroundColor: "transparent", border: "none", cursor: "pointer", boxShadow: "0 2px 0px #00bcd4" }}
                 >
                     Status
                 </motion.button>

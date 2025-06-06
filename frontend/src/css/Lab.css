@@ -12,7 +12,7 @@
   font-size: 2rem;
   font-weight: 700;
   margin-bottom: 2rem;
-  color: #90caf9;
+  color: #00bcd4;
   letter-spacing: 1px;
 }
 
@@ -29,7 +29,7 @@
   border-radius: 1rem;
   box-shadow: 0 2px 16px rgba(33, 150, 243, 0.12);
   background: #1b263b;
-  border: 2px solid #1976d2;
+  border: 2px solid #00bcd4;
   object-fit: cover;
   min-width: 400px;
 }
@@ -46,7 +46,7 @@
 }
 
 .lab-controls button {
-  background: #1976d2;
+  background: #00bcd4;
   color: #e0f7fa;
   border: none;
   border-radius: 2rem;
@@ -54,22 +54,23 @@
   font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
+  border: 2px solid #00bcd4;
   transition: background 0.2s, box-shadow 0.2s;
   box-shadow: 0 2px 8px rgba(33, 150, 243, 0.12);
 }
 
 .lab-controls button:hover {
-  background: #1565c0;
+  background: #00bcd4;
 }
 
 .lab-controls input[type="range"] {
   width: 320px;
-  accent-color: #1976d2;
+  accent-color: #00bcd4;
   margin: 0 1rem;
 }
 
 .lab-controls span {
-  color: #90caf9;
+  color: #00bcd4;
   font-size: 1rem;
   min-width: 60px;
   text-align: right;

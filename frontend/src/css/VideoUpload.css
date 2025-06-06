@@ -2,6 +2,7 @@ body {
   height: 70vh;
   margin: 0;
   color: #e0f7fa;
+  background: linear-gradient(#0d1b2a 100%);
 }
 
 .video-upload-container {
@@ -12,7 +13,7 @@ body {
   padding: 2rem 1rem;
   background: linear-gradient(135deg, #1b263b 0%, #0d1b2a 100%);
   border-radius: 1.5rem;
-  box-shadow: 0 2px 16px rgba(0, 188, 212, 0.08);
+  box-shadow: 0 2px 16px rgba(0, 188, 212, 0.18);
   max-width: 400px;
   margin: 4rem auto;
   width: 60%;
@@ -20,22 +21,22 @@ body {
 
 .video-upload-label {
   padding: 1rem 2rem;
-  background: #1b263b;
-  border: 2px dashed #2196f3;
+  background: #00000000;
+  border: 2px dashed #00bcd4;
   border-radius: 1rem;
-  color: #90caf9;
+  color: #00bcd4;
   font-weight: 600;
   cursor: pointer;
   transition: border-color 0.2s, background 0.2s, color 0.2s;
-  box-shadow: 0 2px 8px rgba(33, 150, 243, 0.04);
+  box-shadow: 0 2px 8px rgba(0, 188, 212, 0.08);
   text-align: center;
   width: 70%;
 }
 
 .video-upload-label:hover {
-  border-color: #1565c0;
-  background: #0d1b2a;
-  color: #42a5f5;
+  border-color: #00bcd4;
+  background: #002f3b;
+  color: #4dd0e1;
 }
 
 .video-upload-input {
@@ -44,15 +45,15 @@ body {
 
 .video-upload-btn {
   padding: 0.75rem 2rem;
-  background: #1976d2;
-  color: #e0f7fa;
+  background: #00bcd4;
+  color: #003f4c;
   border: none;
   border-radius: 2rem;
   font-size: 1.1rem;
   font-weight: 700;
   cursor: pointer;
   transition: background 0.2s, box-shadow 0.2s, transform 0.1s, color 0.2s;
-  box-shadow: 0 2px 8px rgba(33, 150, 243, 0.12);
+  box-shadow: 0 2px 8px rgba(0, 188, 212, 0.18);
 }
 
 .video-upload-btn:disabled {
@@ -65,25 +66,25 @@ body {
 .video-upload-select {
   padding: 0.5rem 1rem;
   border-radius: 0.5rem;
-  border: 1.5px solid #1976d2;
-  background: #1b263b;
-  color: #90caf9;
+  border: 1.5px solid #00bcd4;
+  background: #00000000;
+  color: #00bcd4;
   font-size: 1rem;
   margin-bottom: 1rem;
   margin-top: 0.5rem;
   outline: none;
   transition: border-color 0.2s, box-shadow 0.2s;
-  box-shadow: 0 2px 8px rgba(33, 150, 243, 0.04);
+  box-shadow: 0 2px 8px rgba(0, 188, 212, 0.08);
 }
 
 .video-upload-select:focus {
-  border-color: #42a5f5;
-  box-shadow: 0 0 0 2px #1976d233;
+  border-color: #4dd0e1;
+  box-shadow: 0 0 0 2px #00bcd433;
 }
 
 .video-upload-select option {
-  background: #0d1b2a;
-  color: #90caf9;
+  background: #002f3b;
+  color: #00bcd4;
 }
 
 .video-upload-footer {
