@@ -17,6 +17,7 @@ type FramePoints = { [frame: number]: ({ x: number; y: number } | null)[] };
 export const Lab = () => {
     const [videoUrl, setVideoUrl] = useState<string>("");
     const [csvUrl, setCsvUrl] = useState<string>("");
+    const [videoId, setVideoId] = useState<string>("");
     const [frames, setFrames] = useState<FramePoints>({});
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentTime, setCurrentTime] = useState(0);
@@ -31,12 +32,6 @@ export const Lab = () => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [csvReloadKey, setCsvReloadKey] = useState(0);
 
-    // Extract videoId from videoUrl (assuming /media/videos_hashed/<uuid>.<ext>)
-    const videoId = (() => {
-        const match = videoUrl.match(/([0-9a-fA-F-]{8}-[0-9a-fA-F-]{4}-[0-9a-fA-F-]{4}-[0-9a-fA-F-]{4}-[0-9a-fA-F-]{12})/);
-        return match ? match[1] : null;
-    })();
-
     // Fetch video and CSV URLs
     useEffect(() => {
         fetch("http://127.0.0.1:8000/video/latest/")
@@ -44,6 +39,7 @@ export const Lab = () => {
             .then(data => {
                 if (data.video1) setVideoUrl(data.video1);
                 if (data.csv_url) setCsvUrl(data.csv_url);
+                if (data.video_id) setVideoId(data.video_id);
             });
     }, [csvReloadKey]);
 
@@ -413,6 +409,15 @@ export const Lab = () => {
                     style={{ color: "#00bcd4", backgroundColor: "transparent", border: "none", cursor: "pointer", boxShadow: "0 2px 0px #00bcd4" }}
                 >
                     Status
+                </motion.button>
+                <motion.button
+                    className="back-button"
+                    onClick={() => navigate("/videos")}
+                    whileHover={{ scale: 1.05, boxShadow: "8px 8px #00bcd4" }}
+                    whileTap={{ scale: 0.95, boxShadow: "4px 3px #00bcd4" }}
+                    style={{ color: "#00bcd4", backgroundColor: "transparent", border: "none", cursor: "pointer", margin: "auto", boxShadow: "0 2px 0px #00bcd4" }}
+                >
+                    Videos
                 </motion.button>
             </div>
         </motion.div>

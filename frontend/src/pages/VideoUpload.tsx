@@ -94,18 +94,30 @@ const VideoUpload = () => {
         </motion.div>
       </div>
       {status && (
-      <div style={{position: "fixed", bottom: "300px", width: "100%", height: "200px", display: "flex", justifyContent: "center", alignItems: "center"}}>
-          <StatusPage/>
+      <div style={{position: "fixed", top: "300px", width: "100%", height: "200px", display: "flex", justifyContent: "center", alignItems: "center"}}>
+          <StatusPage/> 
+          <button className="close-status-btn" onClick={() => setStatus(false)} style={{position: "absolute", bottom: "-320px", right: "46vw", backgroundColor: "#00bcd4", color: "#fff", border: "none", padding: "10px 20px", borderRadius: "5px", cursor: "pointer"}}> 
+            close status
+          </button>
       </div>)}
       <div className="video-upload-footer">
         <motion.button
             className="back-button"
             onClick={() => setStatus(!status)}
-            whileHover={{ scale: 1.05, boxShadow: "8px 8px #00bcd4", color: "#fff" }}
+            whileHover={{ scale: 1.05, boxShadow: "8px 8px #00bcd4" }}
             whileTap={{ scale: 0.95, boxShadow: "4px 3px #00bcd4" }}
             style={{ color: "#00bcd4", backgroundColor: "transparent", border: "none", cursor: "pointer", margin: "auto", boxShadow: "0 2px 0px #00bcd4" }}
         >
             Status
+        </motion.button>
+        <motion.button
+            className="back-button"
+            onClick={() => navigate("/videos")}
+            whileHover={{ scale: 1.05, boxShadow: "8px 8px #00bcd4" }}
+            whileTap={{ scale: 0.95, boxShadow: "4px 3px #00bcd4" }}
+            style={{ color: "#00bcd4", backgroundColor: "transparent", border: "none", cursor: "pointer", margin: "auto", boxShadow: "0 2px 0px #00bcd4" }}
+        >
+            Videos
         </motion.button>
       </div>
     </>
