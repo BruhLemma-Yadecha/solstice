@@ -26,21 +26,43 @@ export const Lab = () => {
     const [startTime, setStartTime] = useState(0);
     const [endTime, setEndTime] = useState(0);
     const [status, setStatus] = useState(false);
-    const navigate = useNavigate();
-
-    const videoRef = useRef<HTMLVideoElement>(null);
-    const canvasRef = useRef<HTMLCanvasElement>(null);
     const [csvReloadKey, setCsvReloadKey] = useState(0);
 
-    // Fetch video and CSV URLs
+    const navigate = useNavigate();
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+
+    // Poll /latest/ until both video1 and csv_url are available
     useEffect(() => {
-        fetch("http://127.0.0.1:8000/video/latest/")
-            .then(res => res.json())
-            .then(data => {
-                if (data.video1) setVideoUrl(data.video1);
-                if (data.csv_url) setCsvUrl(data.csv_url);
-                if (data.video_id) setVideoId(data.video_id);
-            });
+        let cancelled = false;
+        let pollTimeout: NodeJS.Timeout;
+
+        const pollLatest = async () => {
+            try {
+                const res = await fetch("http://127.0.0.1:8000/video/latest/");
+                const data = await res.json();
+                if (data.video1 && data.csv_url) {
+                    if (!cancelled) {
+                        setVideoUrl(data.video1);
+                        setCsvUrl(data.csv_url);
+                        if (data.video_id) setVideoId(data.video_id);
+                    }
+                } else {
+                    // Not ready, poll again after 1s
+                    pollTimeout = setTimeout(pollLatest, 1000);
+                }
+            } catch {
+                // On error, poll again after 2s
+                pollTimeout = setTimeout(pollLatest, 2000);
+            }
+        };
+
+        pollLatest();
+
+        return () => {
+            cancelled = true;
+            if (pollTimeout) clearTimeout(pollTimeout);
+        };
     }, [csvReloadKey]);
 
     // Fetch and parse CSV into a mapping from frame number → 33-length array of {x,y} or null
@@ -55,9 +77,7 @@ export const Lab = () => {
                         const grouped: FramePoints = {};
                         (results.data as any[]).forEach((row: any) => {
                             const frameIdx = parseInt(row.frame, 10);
-                            // Build an array of length 33; if a landmark is missing, put null
                             const points: ({ x: number; y: number } | null)[] = new Array(33).fill(null);
-
                             for (let i = 0; i < 33; i++) {
                                 const xKey = `landmark_${i}_x`;
                                 const yKey = `landmark_${i}_y`;
@@ -67,7 +87,6 @@ export const Lab = () => {
                                     points[i] = { x: xVal, y: yVal };
                                 }
                             }
-
                             grouped[frameIdx] = points;
                         });
                         setFrames(grouped);
@@ -76,7 +95,7 @@ export const Lab = () => {
             });
     }, [csvUrl]);
 
-    // Draw a stick figure (with interpolation) onto the canvas on each time update
+    // Draw stick figure on canvas for the current video time
     useEffect(() => {
         if (!canvasRef.current || !videoRef.current) return;
         const canvas = canvasRef.current;
@@ -85,7 +104,6 @@ export const Lab = () => {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         const fps = 30;
-        // Compute fractional frame index relative to ex
         const relativeTime = currentTime - ex;
         if (relativeTime < 0) return;
         const currentFrame = relativeTime * fps;
@@ -114,23 +132,17 @@ export const Lab = () => {
 
         // Define MediaPipe 33-keypoint skeleton connections
         const skeleton: [number, number][] = [
-            [0, 1], [1, 2], [2, 3], [3, 7],       // Right arm
-            [0, 4], [4, 5], [5, 6], [6, 8],       // Left arm
-            [9, 10],                              // Shoulders
-            [11, 12],                             // Hips
-            [11, 13], [13, 15],                   // Left leg
-            [12, 14], [14, 16],                   // Right leg
-            [11, 23], [12, 24],                   // Lower body
-            [23, 25], [25, 27],                   // Left lower leg
-            [24, 26], [26, 28],                   // Right lower leg
-            [27, 29], [29, 31],                   // Left foot
-            [28, 30], [30, 32],                   // Right foot
+            [0, 1], [1, 2], [2, 3], [3, 7],
+            [0, 4], [4, 5], [5, 6], [6, 8],
+            [9, 10], [11, 12], [11, 13], [13, 15],
+            [12, 14], [14, 16], [11, 23], [12, 24],
+            [23, 25], [25, 27], [24, 26], [26, 28],
+            [27, 29], [29, 31], [28, 30], [30, 32],
         ];
 
         ctx.strokeStyle = "#00bcd4";
         ctx.lineWidth = 2;
 
-        // Draw each stick segment if both endpoints exist
         skeleton.forEach(([a, b]) => {
             const ptA = interpolatedPoints[a];
             const ptB = interpolatedPoints[b];
@@ -142,7 +154,6 @@ export const Lab = () => {
             }
         });
 
-        // Draw each joint as a small circle
         ctx.fillStyle = "#00bcd4";
         interpolatedPoints.forEach((pt) => {
             if (pt) {
@@ -153,45 +164,42 @@ export const Lab = () => {
         });
     }, [currentTime, frames, ex]);
 
-    // Play/Pause video whenever isPlaying or videosReady changes
+    // Play/Pause video when isPlaying or videosReady changes
     useEffect(() => {
+        if (!videoRef.current) return;
         if (videosReady) {
             if (isPlaying) {
-                videoRef.current?.play();
+                videoRef.current.play();
             } else {
-                videoRef.current?.pause();
+                videoRef.current.pause();
             }
         }
     }, [isPlaying, videosReady]);
 
-    // Sync React state currentTime → video.currentTime, but only if out of tolerance
+    // Sync currentTime to video element (if out of sync)
     useEffect(() => {
-        if (!videosReady) return;
+        if (!videosReady || !videoRef.current) return;
+        if (Math.abs(videoRef.current.currentTime - currentTime) > 0.1) {
+            videoRef.current.currentTime = currentTime;
+        }
+    }, [currentTime, videosReady]);
+
+    // Set ex offset on first play
+    useEffect(() => {
+        if (!videosReady || !videoRef.current) return;
+        if (ex === 0 && videoRef.current.currentTime > 0) {
+            setEx(videoRef.current.currentTime);
+        }
+    }, [videosReady, ex]);
+
+    // Listen for user seeking via video controls (if enabled)
+    useEffect(() => {
         const video = videoRef.current;
         if (!video) return;
-
-        if (Math.abs(video.currentTime - currentTime) > 0.1) {
-            video.currentTime = currentTime;
-        }
-
-        // On first sync, capture offset "ex"
-        if (ex === 0 && video.currentTime > 0) {
-            setEx(video.currentTime);
-        }
-    }, [currentTime, videosReady, ex]);
-
-    // Update currentTime when the user seeks via the video element (if controls are enabled)
-    useEffect(() => {
-        const video = videoRef.current;
-        if (!video) return;
-        const onSeeked = () => {
-            setCurrentTime(video.currentTime);
-        };
+        const onSeeked = () => setCurrentTime(video.currentTime);
         video.addEventListener("seeked", onSeeked);
-        return () => {
-            video.removeEventListener("seeked", onSeeked);
-        };
-    }, [videoRef]);
+        return () => video.removeEventListener("seeked", onSeeked);
+    }, []);
 
     // When video metadata is loaded, set times and mark ready
     const handleLoadedMetadata = () => {
@@ -200,6 +208,8 @@ export const Lab = () => {
             setStartTime(0);
             setEndTime(dur);
             setVideosReady(true);
+            setCurrentTime(0);
+            setEx(0);
         }
     };
 
@@ -260,7 +270,7 @@ export const Lab = () => {
             .then((response) => {
                 if (response.ok) {
                     alert("CSV regeneration started. It may take a few seconds.");
-                    setCsvReloadKey(k => k + 1); // This will re-fetch the CSV when ready
+                    setCsvReloadKey(k => k + 1);
                 } else {
                     alert("Error regenerating CSV");
                 }
@@ -277,7 +287,6 @@ export const Lab = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, type: "spring" }}
         >
-
             <motion.h2
                 className="lab-title"
                 initial={{ opacity: 0, y: -20 }}
@@ -286,7 +295,6 @@ export const Lab = () => {
             >
                 Lab Solstice
             </motion.h2>
-
             <motion.div
                 className="lab-videos-row"
                 initial={{ opacity: 0, scale: 0.95 }}
@@ -322,7 +330,6 @@ export const Lab = () => {
                     style={{ background: "#222", borderRadius: "1rem" }}
                 />
             </motion.div>
-
             <motion.div
                 className="lab-controls"
                 initial={{ opacity: 0, y: 20 }}
@@ -337,11 +344,11 @@ export const Lab = () => {
                     disabled={!videosReady}
                 >
                     {isPlaying ? "Pause" : "Play"}
-                </motion.button>    
+                </motion.button>
                 <motion.input
                     type="range"
-                    min={startTime + ex}
-                    max={endTime + ex}
+                    min={startTime}
+                    max={endTime}
                     value={currentTime}
                     onChange={handleSeek}
                     step={0.01}
@@ -359,20 +366,20 @@ export const Lab = () => {
                         transition: "box-shadow 0.2s, background 0.2s"
                     }}
                 />
-
                 <motion.span
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: 0.7 }}
                 >
-                    {formatTime(currentTime)} / {formatTime(endTime + ex)}
+                    {formatTime(currentTime)} / {formatTime(endTime)}
                 </motion.span>
             </motion.div>
             {status && (
-            <div style={{position: "fixed", left: "10px", top: "10px", width: "calc(100% - 20px)", height: "100px", display: "flex", justifyContent: "center", alignItems: "center"}}>
-                <button onClick={() => setStatus(!status)} style={{border: "none", background: "none", color: "#00bcd4", cursor: "pointer", right: "10px", boxShadow: "0 2px 26px rgba(0, 92, 212, 0.618)", backgroundColor: "transparent"}}>x</button>
-                <StatusPage/>
-            </div>)}
+                <div style={{ position: "fixed", left: "10px", top: "10px", width: "calc(100% - 20px)", height: "100px", display: "flex", justifyContent: "center", alignItems: "center" }}>
+                    <button onClick={() => setStatus(!status)} style={{ border: "none", background: "none", color: "#00bcd4", cursor: "pointer", right: "10px", boxShadow: "0 2px 26px rgba(0, 92, 212, 0.618)", backgroundColor: "transparent" }}>x</button>
+                    <StatusPage />
+                </div>
+            )}
             <div style={{ display: "flex", gap: "2rem", justifyContent: "center", margin: "2rem 0" }}>
                 <motion.button
                     className="back-button"
