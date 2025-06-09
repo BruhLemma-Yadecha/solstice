@@ -4,15 +4,18 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('video_processing', '0001_initial'),
+        ("video_processing", "0001_initial"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='videojob',
-            name='error_message',
-            field=models.TextField(blank=True, help_text='Error message captured if the processing job fails or encounters an issue.', null=True),
+            model_name="videojob",
+            name="error_message",
+            field=models.TextField(
+                blank=True,
+                help_text="Error message captured if the processing job fails or encounters an issue.",
+                null=True,
+            ),
         ),
     ]

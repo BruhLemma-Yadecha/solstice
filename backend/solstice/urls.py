@@ -25,5 +25,5 @@ urlpatterns = [
     # path("admin/", admin.site.urls),
     # path("upload/", VideoUploadView.as_view(), name="video-upload"),
     # path("videos/", VideoListView.as_view(), name="video-list"),
-    path('video/', include('apps.video_processing.urls', namespace='video_processing')),
+    path("video/", include("apps.video_processing.urls", namespace="video_processing")),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

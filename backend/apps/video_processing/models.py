@@ -195,7 +195,7 @@ class VideoJob(models.Model):
     error_message = models.TextField(
         null=True,
         blank=True,
-        help_text="Error message captured if the processing job fails or encounters an issue."
+        help_text="Error message captured if the processing job fails or encounters an issue.",
     )
     celery_pose_task_id = models.CharField(
         max_length=255,

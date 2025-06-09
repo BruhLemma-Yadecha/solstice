@@ -21,13 +21,15 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv('SECRET_KEY', 'a_default_fallback_secret_key_if_not_set')
+SECRET_KEY = os.getenv("SECRET_KEY", "a_default_fallback_secret_key_if_not_set")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv('DEBUG', 'True') == 'True'
+DEBUG = os.getenv("DEBUG", "True") == "True"
 
-ALLOWED_HOSTS_STRING = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1')
-ALLOWED_HOSTS = [host.strip() for host in ALLOWED_HOSTS_STRING.split(',') if host.strip()]
+ALLOWED_HOSTS_STRING = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1")
+ALLOWED_HOSTS = [
+    host.strip() for host in ALLOWED_HOSTS_STRING.split(",") if host.strip()
+]
 
 
 # Application definition
@@ -76,25 +78,31 @@ WSGI_APPLICATION = "solstice.wsgi.application"
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
 DATABASES = {
-    'default': {
-        'ENGINE': os.getenv('DB_ENGINE', 'django.db.backends.sqlite3'),
-        'NAME': os.getenv('DB_NAME', BASE_DIR / 'db.sqlite3'),
-        'USER': os.getenv('DB_USER'), # No default, should be set in .env for PostgreSQL
-        'PASSWORD': os.getenv('DB_PASSWORD'), # No default
-        'HOST': os.getenv('DB_HOST'), # No default for PostgreSQL, 'localhost' or service name
-        'PORT': os.getenv('DB_PORT'), # No default for PostgreSQL, typically '5432'
+    "default": {
+        "ENGINE": os.getenv("DB_ENGINE", "django.db.backends.sqlite3"),
+        "NAME": os.getenv("DB_NAME", BASE_DIR / "db.sqlite3"),
+        "USER": os.getenv(
+            "DB_USER"
+        ),  # No default, should be set in .env for PostgreSQL
+        "PASSWORD": os.getenv("DB_PASSWORD"),  # No default
+        "HOST": os.getenv(
+            "DB_HOST"
+        ),  # No default for PostgreSQL, 'localhost' or service name
+        "PORT": os.getenv("DB_PORT"),  # No default for PostgreSQL, typically '5432'
     }
 }
 
 # If using SQLite (the default if DB_ENGINE is not set or is sqlite3),
 # and DB_NAME is the default (BASE_DIR / 'db.sqlite3'), ensure NAME is a Path object.
-if DATABASES['default']['ENGINE'] == 'django.db.backends.sqlite3' and DATABASES['default']['NAME'] == str(BASE_DIR / 'db.sqlite3'):
-    DATABASES['default']['NAME'] = BASE_DIR / 'db.sqlite3'
-elif DATABASES['default']['ENGINE'] == 'django.db.backends.postgresql':
+if DATABASES["default"]["ENGINE"] == "django.db.backends.sqlite3" and DATABASES[
+    "default"
+]["NAME"] == str(BASE_DIR / "db.sqlite3"):
+    DATABASES["default"]["NAME"] = BASE_DIR / "db.sqlite3"
+elif DATABASES["default"]["ENGINE"] == "django.db.backends.postgresql":
     # Ensure port is an integer if provided
-    if DATABASES['default'].get('PORT'):
+    if DATABASES["default"].get("PORT"):
         try:
-            DATABASES['default']['PORT'] = int(DATABASES['default']['PORT'])
+            DATABASES["default"]["PORT"] = int(DATABASES["default"]["PORT"])
         except ValueError:
             # Handle error or remove port if invalid, or let Django raise an error
             pass
@@ -154,17 +162,21 @@ os.makedirs(MEDIA_ROOT, exist_ok=True)
 
 # CELERY SETTINGS
 
-CELERY_BROKER_REDIS_DB_NUMBER = os.getenv('CELERY_BROKER_REDIS_DB_NUMBER', '0')
-CELERY_RESULTS_REDIS_DB_NUMBER = os.getenv('CELERY_RESULTS_REDIS_DB_NUMBER', '1')
-REDIS_HOST = os.getenv('REDIS_HOST', 'localhost')
-REDIS_PORT = os.getenv('REDIS_PORT', '6379')
+CELERY_BROKER_REDIS_DB_NUMBER = os.getenv("CELERY_BROKER_REDIS_DB_NUMBER", "0")
+CELERY_RESULTS_REDIS_DB_NUMBER = os.getenv("CELERY_RESULTS_REDIS_DB_NUMBER", "1")
+REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
+REDIS_PORT = os.getenv("REDIS_PORT", "6379")
 
 CELERY_BROKER_URL = f"redis://{REDIS_HOST}:{REDIS_PORT}/{CELERY_BROKER_REDIS_DB_NUMBER}"
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
-CELERY_TIMEZONE = "UTC" # Or your project's timezone
-CELERY_RESULT_BACKEND = f"redis://{REDIS_HOST}:{REDIS_PORT}/{CELERY_RESULTS_REDIS_DB_NUMBER}"
+CELERY_TIMEZONE = "UTC"  # Or your project's timezone
+CELERY_RESULT_BACKEND = (
+    f"redis://{REDIS_HOST}:{REDIS_PORT}/{CELERY_RESULTS_REDIS_DB_NUMBER}"
+)
 CELERY_TASK_TRACK_STARTED = True  # So tasks get a 'STARTED' state
 
-MEDIAPIPE_MODELS_BASE_PATH = os.getenv('MEDIAPIPE_MODELS_BASE_PATH', 'apps/video_processing/models')
+MEDIAPIPE_MODELS_BASE_PATH = os.getenv(
+    "MEDIAPIPE_MODELS_BASE_PATH", "apps/video_processing/models"
+)

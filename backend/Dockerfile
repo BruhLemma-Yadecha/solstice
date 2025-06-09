@@ -1,42 +1,56 @@
-# Use an official Python runtime as a parent image
-FROM python:3.12-slim
+FROM python:3.12-slim AS builder
 
-# Set environment variables
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
 
-# Set work directory
-WORKDIR /app
-
-# Install system dependencies required by OpenCV and other common libraries
-# It's good practice to install these before Python dependencies
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    build-essential \
+    libpq-dev \
     libgl1-mesa-glx \
     libglib2.0-0 \
-    --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
-# We copy only requirements.txt first to leverage Docker cache
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV PATH="/root/.local/bin:$PATH"
+
+WORKDIR /app
+
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN uv pip wheel --no-cache-dir --wheel-dir /wheels -r requirements.txt
 
-# Add gunicorn if not in requirements.txt; it's a common production server for Django
-# This line assumes gunicorn might not be in requirements.txt.
-# If it is, this line might be redundant or could be used to ensure a specific version.
-RUN pip install --no-cache-dir gunicorn
+FROM python:3.12-slim
 
-# Copy the rest of the application code
+ENV PYTHONDONTWRITEBYTECODE 1
+ENV PYTHONUNBUFFERED 1
+
+RUN addgroup --system app && adduser --system --group app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    libpq-dev \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV PATH="/root/.local/bin:$PATH"
+
+WORKDIR /app
+
+COPY --from=builder /wheels /wheels
+
+RUN uv pip install --no-index --find-links=/wheels /wheels/*
+
+COPY ./entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
 COPY . .
 
-# Expose the port the app runs on
+RUN chown -R app:app /app
+
+USER app
+
+ENTRYPOINT ["entrypoint.sh"]
+
 EXPOSE 8000
-
-# Run the application
-# Adjust 'solstice.wsgi:application' if your Django project name is different.
-# The number of workers can be adjusted based on your server's resources.
-# The WEB_APP_CONTAINER_PORT environment variable (defaulting to 8000) is used here,
-# similar to how it's used in the docker-compose.yml command.
-CMD exec gunicorn --workers 3 --bind "0.0.0.0:${WEB_APP_CONTAINER_PORT:-8000}" solstice.wsgi:application
-
-RUN python manage.py migrate
