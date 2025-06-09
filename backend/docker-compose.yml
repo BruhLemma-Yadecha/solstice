@@ -3,7 +3,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    command: gunicorn --workers 3 --bind 0.0.0.0:${WEB_APP_CONTAINER_PORT:-8000} solstice.wsgi:application
+    image: solstice
+    container_name: solstice_web
+    command: gunicorn --workers 3 --bind 0.0.0.0:8000 solstice.wsgi:application
     volumes:
       - .:/app
       - media_volume:/app/media
@@ -12,18 +14,52 @@ services:
     env_file:
       - .env
     depends_on:
-      - redis
-      - db
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
 
   redis:
-    image: "redis:alpine"
+    image: "redis:8-alpine"
+    container_name: solstice_redis
     ports:
-      - "${REDIS_HOST_PORT_FORWARD:-6379}:${REDIS_CONTAINER_PORT:-6379}"
-
-  celery_worker:
+      - "${REDIS_HOST_PORT_FORWARD:-6380}:${REDIS_CONTAINER_PORT:-6379}"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+  db:
+    image: postgres:17-alpine
+    container_name: solstice_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    env_file:
+      - .env
+    ports:
+      - "${POSTGRES_HOST_PORT_FORWARD:-5434}:${POSTGRES_CONTAINER_PORT:-5432}"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+  migrate:
     build:
       context: .
       dockerfile: Dockerfile
+    container_name: solstice_migrate
+    command: python manage.py migrate
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: solstice_worker
     command: celery -A solstice worker -l info
     volumes:
       - .:/app
@@ -31,18 +67,10 @@ services:
     env_file:
       - .env
     depends_on:
-      - web
-      - redis
-      - db
-
-  db:
-    image: postgres:17-alpine
-    volumes:
-      - postgres_data:/var/lib/postgresql/data/
-    ports:
-      - "${POSTGRES_HOST_PORT_FORWARD:-5432}:${POSTGRES_CONTAINER_PORT:-5432}"
-    env_file:
-      - .env
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
 
 volumes:
   postgres_data:

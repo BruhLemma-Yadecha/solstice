@@ -11,6 +11,7 @@ from django.db import transaction
 from django.conf import settings  # Added for settings.MEDIA_ROOT
 
 from .models import VideoJob, Video
+
 # Import your service functions here once they are created
 from .services import pose_extraction
 
@@ -105,13 +106,13 @@ def video_to_pose_data_task(self, job_id):
             logger.info(
                 f"Job {job_id}: No reusable pose data found or failed to read. Generating new pose data."
             )
-            pose_data_csv_content = pose_extraction.generate_pose_data_csv(job.input_video.file.path, job.pose_algorithm_id)
+            pose_data_csv_content = pose_extraction.generate_pose_data_csv(
+                job.input_video.file.path, job.pose_algorithm_id
+            )
             reused_pose_data = False
 
         if pose_data_csv_content:
-            file_name_base = (
-                f"{job.id}_posedata_v{job.pose_algorithm_id}.csv"
-            )
+            file_name_base = f"{job.id}_posedata_v{job.pose_algorithm_id}.csv"
 
             with transaction.atomic():
                 job_update = VideoJob.objects.select_for_update().get(id=job_id)
@@ -226,4 +227,3 @@ def pose_data_to_armature_video_task(self, job_id):
             logger.error(
                 f"VideoJob {job_id} not found when trying to mark as FAILED after error."
             )
-

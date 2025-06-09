@@ -33,4 +33,3 @@ def debug_task(self):
 #
 #    (Replace 'solstice' with your project name if it's different in this context)
 #
-

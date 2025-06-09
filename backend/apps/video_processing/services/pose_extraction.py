@@ -5,6 +5,7 @@ from .mediapipe import MEDIAPIPE_MODELS, run_mediapipe_on_video
 # Get an instance of a logger
 logger = logging.getLogger(__name__)
 
+
 def generate_pose_data_csv(video_file_path: str, algorithm_id: int) -> bytes:
     """
     Processes the video file using the specified pose estimation algorithm

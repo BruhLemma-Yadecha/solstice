@@ -145,4 +145,3 @@ def process_video_and_save_csv(video_path):
         return output_csv_path
     else:
         return None
-
