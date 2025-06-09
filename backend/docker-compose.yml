@@ -48,6 +48,7 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: solstice_migrate
+    entrypoint: ""
     command: python manage.py migrate
     env_file:
       - .env
