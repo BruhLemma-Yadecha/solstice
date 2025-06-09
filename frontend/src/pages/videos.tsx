@@ -91,17 +91,18 @@ const ListVideo = () => {
           </motion.div>
         ))}
       </div>
-      <div style={{ marginTop: "2rem", alignContent: "center", display: "flex", justifyContent: "center" }}>
-        <motion.button
-            className="back-button"
-            onClick={() => navigate("/")}
-            whileHover={{ scale: 1.05, boxShadow: "8px 8px #00bcd4", color: "#fff" }}
-            whileTap={{ scale: 0.95, boxShadow: "4px 3px #00bcd4" }}
-            style={{ color: "#00bcd4", backgroundColor: "transparent", border: "none", cursor: "pointer", boxShadow: "0 2px 0px #00bcd4" }}
-        >
-            Back
-        </motion.button>
+      <div style={{ marginTop: "3rem", alignContent: "center", display: "flex", justifyContent: "center", flexDirection: "column", gap: "1rem", margin:"auto", alignItems: "center" }}>
         <div>
+            <motion.button
+                className="back-button"
+                onClick={() => navigate("/")}
+                whileHover={{ scale: 1.05, boxShadow: "8px 8px #00bcd4", color: "#fff" }}
+                whileTap={{ scale: 0.95, boxShadow: "4px 3px #00bcd4" }}
+                style={{ color: "#00bcd4", backgroundColor: "transparent", border: "none", cursor: "pointer", boxShadow: "0 2px 0px #00bcd4" }}
+            >
+                Back
+          </motion.button>
+        </div>
         <motion.button
           className="video-upload-btn"
           onClick={handleSendToUpload}
@@ -113,10 +114,19 @@ const ListVideo = () => {
             boxShadow: selected ? "0 4px 24px #00bcd4" : "none",
           }}
           whileTap={{ scale: 0.96 }}
+            style={{
+                color: "#fff",
+                backgroundColor: selected ? "#00bcd4" : "#ccc",
+                border: "none",
+                padding: "0.5rem 1rem",
+                borderRadius: "0.5rem",
+                cursor: selected ? "pointer" : "not-allowed",
+                boxShadow: selected ? "0 2px 0px #00bcd4" : "none",
+                width: "200px",
+            }}
         >
             {selected ? "Send to Lab" : "Select a video first"}
         </motion.button>
-        </div>
       </div>
     </div>
   );
