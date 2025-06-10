@@ -160,6 +160,19 @@ MEDIA_URL = "/media/"
 MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 os.makedirs(MEDIA_ROOT, exist_ok=True)
 
+MEDIA_SUBDIRECTORIES = [
+    "ingest/videos",
+    "artifacts/pose_estimations",
+    "deliverables/videos",
+    "deliverables/thumbnails",
+    "temp",
+    "logs",
+]
+for sub in MEDIA_SUBDIRECTORIES:
+    os.makedirs(os.path.join(MEDIA_ROOT, sub), exist_ok=True)
+
+DEFAULT_FILE_STORAGE = "apps.video_processing.storage.LocalMediaStorage"
+
 # CELERY SETTINGS
 
 CELERY_BROKER_REDIS_DB_NUMBER = os.getenv("CELERY_BROKER_REDIS_DB_NUMBER", "0")

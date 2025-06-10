@@ -21,8 +21,12 @@ from .models import VideoJob, Video
 
 # Import your service functions here once they are created
 from .services import pose_extraction
-from .services.pose_extraction import NoPoseDataError, UnknownAlgorithmError, PoseExtractionError
-from .tasks.scatter import preprocess_and_scatter
+from .services.pose_extraction import (
+    NoPoseDataError,
+    UnknownAlgorithmError,
+    PoseExtractionError,
+)
+from .task_modules.scatter import preprocess_and_scatter
 
 # Get an instance of a logger
 logger = logging.getLogger(__name__)
@@ -178,6 +182,7 @@ def video_to_pose_data_task_gpu(self, job_id):
 
 # --- Scatter-Gather CPU Workflow ---
 
+
 @shared_task(bind=True, name="video_processing.video_to_pose_data_task_cpu")
 def video_to_pose_data_task_cpu(self, job_id):
     logger.info(f"CPU scatter-gather starting for job {job_id}")
@@ -232,7 +237,15 @@ def pose_data_to_armature_video_task(self, job_id):
 
         with transaction.atomic():
             job_complete = VideoJob.objects.select_for_update().get(id=job_id)
-            job_complete.output_video_path = output_video_file_path
+            # Save output video file via FileField
+            from django.core.files.base import ContentFile
+
+            with open(output_video_file_path, "rb") as f:
+                job_complete.output_video_file.save(
+                    os.path.basename(output_video_file_path),
+                    ContentFile(f.read()),
+                    save=False,
+                )
             job_complete.output_generated_at = timezone.now()
             job_complete.status = VideoJob.JobStatus.COMPLETED
             job_complete.save()

@@ -2,6 +2,8 @@ import logging
 import os
 from enum import Enum
 from .mediapipe import MEDIAPIPE_MODELS, run_mediapipe_on_video
+import cv2
+import mediapipe as mp
 
 # Get an instance of a logger
 logger = logging.getLogger(__name__)
@@ -95,3 +97,28 @@ def generate_pose_data_csv(video_file_path: str, algorithm_id: int) -> bytes:
         raise PoseExtractionError(
             f"Pose estimation failed for algorithm {algorithm_id}: {e}"
         ) from e
+
+
+def extract_pose_from_image(image_path: str) -> list[float]:
+    """
+    Extracts pose landmarks from a single image file and returns a flat list of floats [x0, y0, z0, x1, y1, z1, ...].
+    """
+    image = cv2.imread(image_path)
+    if image is None:
+        logger.error(f"Frame image not found at path: {image_path}")
+        raise FileNotFoundError(f"Frame image not found: {image_path}")
+    image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    # Use MediaPipe Pose for static image processing
+    with mp.solutions.pose.Pose(
+        static_image_mode=True,
+        model_complexity=1,
+        enable_segmentation=False,
+        min_detection_confidence=0.5,
+    ) as pose:
+        results = pose.process(image_rgb)
+    if not results.pose_landmarks:
+        return []
+    landmarks = []
+    for lm in results.pose_landmarks.landmark:
+        landmarks.extend([lm.x, lm.y, lm.z])
+    return landmarks

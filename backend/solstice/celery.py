@@ -13,13 +13,13 @@ app.config_from_object("django.conf:settings", namespace="CELERY")
 app.autodiscover_tasks()
 
 app.conf.task_queues = (
-    Queue('gpu_queue'),
-    Queue('cpu_queue'),
+    Queue("gpu_queue"),
+    Queue("cpu_queue"),
 )
 
 app.conf.task_routes = {
-    'video_processing.video_to_pose_data_task_gpu': {'queue': 'gpu_queue'},
-    'video_processing.video_to_pose_data_task_cpu': {'queue': 'cpu_queue'},
+    "video_processing.video_to_pose_data_task_gpu": {"queue": "gpu_queue"},
+    "video_processing.video_to_pose_data_task_cpu": {"queue": "cpu_queue"},
 }
 
 

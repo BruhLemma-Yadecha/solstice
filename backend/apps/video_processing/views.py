@@ -16,7 +16,7 @@ from .serializers import (
 )
 from .services.utilities import delete_csv
 
-from .tasks import video_to_pose_data_task
+from .tasks import video_to_pose_data_task, dispatch_pose_extraction_task
 
 logger = logging.getLogger(__name__)
 
@@ -152,10 +152,9 @@ class VideoUploadAPIView(APIView):
                     f"VideoJob created: {video_job.id} for Video {video_instance.id}"
                 )
 
-                video_to_pose_data_task.delay(video_job.id)
-                logger.info(
-                    f"Celery task video_to_pose_data_task dispatched for job {video_job.id}"
-                )
+                # Dispatch pose extraction task to appropriate queue (GPU or CPU)
+                dispatch_pose_extraction_task(video_job.id)
+                logger.info(f"Pose extraction task dispatched for job {video_job.id}")
 
             job_detail_serializer = VideoJobDetailSerializer(
                 video_job, context={"request": request}
@@ -221,11 +220,14 @@ class LatestVideoAndCSVAPIView(APIView):
         video_url = request.build_absolute_uri(latest_job.input_video.file.url)
         csv_url = request.build_absolute_uri(latest_job.pose_data_file.url)
         video_id = latest_job.input_video.id
-        return Response({
-            "video1": video_url,
-            "csv_url": csv_url,
-            "video_id": video_id,
-        }, status=status.HTTP_200_OK)
+        return Response(
+            {
+                "video1": video_url,
+                "csv_url": csv_url,
+                "video_id": video_id,
+            },
+            status=status.HTTP_200_OK,
+        )
 
 
 # video deletion endpoint
@@ -235,13 +237,7 @@ class VideoDeleteAPIView(APIView):
     """
 
     def delete(self, request, video_id, *args, **kwargs):
-
-        video_job = (
-            VideoJob.objects
-            .filter(input_video__id=video_id)
-            .first()
-        )
-         
+        # Find video or return 404
         try:
             video = Video.objects.get(id=video_id)
         except Video.DoesNotExist:
@@ -250,12 +246,12 @@ class VideoDeleteAPIView(APIView):
                 {"detail": "Video not found."}, status=status.HTTP_404_NOT_FOUND
             )
 
-        # Delete all jobs associated with this video
-        VideoJob.objects.filter(input_video=video).delete()
-        logger.info(f"Deleted all jobs associated with video {video.id}")
+        # Delete all jobs and their files (signals handle cleanup)
+        jobs_qs = VideoJob.objects.filter(input_video=video)
+        deleted_count, _ = jobs_qs.delete()
+        logger.info(f"Deleted {deleted_count} jobs associated with video {video.id}")
 
-        # Delete the video file
-        delete_csv(video_job.pose_data_file)
+        # Delete the video record and file (signal handles file cleanup)
         video.delete()
         logger.info(f"Video {video.id} deleted successfully")
 
@@ -275,30 +271,43 @@ class VideoRegenerateCSVAPIView(APIView):
         try:
             video = Video.objects.get(id=video_id)
         except Video.DoesNotExist:
-            logger.warning(f"Regenerate CSV request for non-existent video_id: {video_id}")
-            return Response({"detail": "Video not found."}, status=status.HTTP_404_NOT_FOUND)
-        
-        video_job = (
-            VideoJob.objects
-            .filter(input_video__id=video_id)
-            .first()
-        )
+            logger.warning(
+                f"Regenerate CSV request for non-existent video_id: {video_id}"
+            )
+            return Response(
+                {"detail": "Video not found."}, status=status.HTTP_404_NOT_FOUND
+            )
 
-        delete_csv(video_job.pose_data_file)
+        # Find the latest job for this video
+        try:
+            job = VideoJob.objects.filter(input_video=video).latest("created_at")
+        except VideoJob.DoesNotExist:
+            return Response(
+                {"detail": "No job found for this video."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
 
-        # Trigger the regeneration of the CSV
-        video_to_pose_data_task.delay(video.id)
-        logger.info(
-            f"Celery task video_to_pose_data_task dispatched for video {video.id}"
-        )
+        # Create a new VideoJob for CSV regeneration
+        with transaction.atomic():
+            new_job = VideoJob.objects.create(
+                input_video=video,
+                pose_algorithm_id=job.pose_algorithm_id,
+                status=VideoJob.JobStatus.UPLOADED,
+            )
+            dispatch_pose_extraction_task(new_job.id)
+            logger.info(
+                f"CSV regeneration job created: {new_job.id} for video {video.id}"
+            )
+        serializer = VideoJobDetailSerializer(new_job, context={"request": request})
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
-        return Response({"detail": "CSV regeneration initiated."}, status=status.HTTP_202_ACCEPTED)
-    
+
 class VideoListAPIView(APIView):
     """
     API View to list all videos.
     """
+
     def get(self, request, *args, **kwargs):
         videos = Video.objects.all()
-        serializer = VideoSerializer(videos, many=True, context={'request': request})
+        serializer = VideoSerializer(videos, many=True, context={"request": request})
         return Response(serializer.data, status=status.HTTP_200_OK)

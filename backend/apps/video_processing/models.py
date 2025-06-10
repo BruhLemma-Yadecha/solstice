@@ -1,5 +1,3 @@
-# apps/video_processing/models.py
-
 import hashlib
 import uuid
 import os
@@ -8,11 +6,9 @@ from django.conf import settings
 
 
 def get_hashed_video_upload_path(instance, filename):
-    ext = filename.split(".")[-1]
-    if not ext:
-        ext = "bin"  # Default extension if none found
+    ext = filename.split(".")[-1] or "bin"
     unique_filename = f"{uuid.uuid4()}.{ext.lower()}"
-    return os.path.join("videos_hashed", unique_filename)
+    return os.path.join("ingest", "videos", unique_filename)
 
 
 class Video(models.Model):
@@ -113,7 +109,16 @@ def get_pose_data_upload_path(instance, filename):
     job_id = instance.id if instance.id else uuid.uuid4()
     # The 'filename' argument might be the original, but we enforce our own.
     new_filename = f"{job_id}_posedata.csv"
-    return os.path.join("intermediate_data", "pose_csvs", new_filename)
+    return os.path.join("artifacts", "pose_estimations", new_filename)
+
+
+def get_output_video_upload_path(instance, filename):
+    """
+    Generates upload path for final output videos.
+    """
+    ext = os.path.splitext(filename)[1] or ".mp4"
+    filename = f"{instance.id}_output{ext}"
+    return os.path.join("deliverables", "videos", filename)
 
 
 class VideoJob(models.Model):
@@ -174,11 +179,11 @@ class VideoJob(models.Model):
     # Path or reference to the final output video.
     # Could be a FileField if you create another Video model instance for output,
     # or a CharField if it's a temporary path managed differently.
-    output_video_path = models.CharField(
-        max_length=1024,
+    output_video_file = models.FileField(
+        upload_to=get_output_video_upload_path,
         null=True,
         blank=True,
-        help_text="Path or identifier for the final processed output video file.",
+        help_text="Final processed output video file.",
     )
     output_generated_at = models.DateTimeField(
         null=True,

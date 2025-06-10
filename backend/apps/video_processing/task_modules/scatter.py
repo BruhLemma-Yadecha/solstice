@@ -32,17 +32,22 @@ def preprocess_and_scatter(self, job_id):
         # create temp dir and extract frames
         workdir = tempfile.mkdtemp(prefix=f"job_{job_id}_frames_")
         cmd = [
-            "ffmpeg", "-i", job.input_video.file.path,
-            "-vsync", "0",
-            os.path.join(workdir, "frame_%08d.png")
+            "ffmpeg",
+            "-i",
+            job.input_video.file.path,
+            "-vsync",
+            "0",
+            os.path.join(workdir, "frame_%08d.png"),
         ]
         subprocess.run(cmd, check=True)
         frames = sorted(
-            os.path.join(workdir, fn) for fn in os.listdir(workdir) if fn.endswith(".png")
+            os.path.join(workdir, fn)
+            for fn in os.listdir(workdir)
+            if fn.endswith(".png")
         )
         chord(
             (process_frame.s(path) for path in frames),
-            aggregate_results.s(job_id, workdir)
+            aggregate_results.s(job_id, workdir),
         ).apply_async()
         return frames
     except Exception as e:

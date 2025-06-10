@@ -17,22 +17,23 @@ def aggregate_results(self, results, job_id, workdir):
     Reduce phase: combine per-frame landmarks into CSV, save to VideoJob, and clean up.
     """
     try:
-        sorted_res = sorted(results, key=lambda r: r['frame'])
+        sorted_res = sorted(results, key=lambda r: r["frame"])
         csv_path = os.path.join(workdir, f"{job_id}_pose_results.csv")
-        with open(csv_path, 'w', newline='') as csvfile:
+        with open(csv_path, "w", newline="") as csvfile:
             writer = csv.writer(csvfile)
-            header = ['frame'] + [f'x{i}' for i in range(len(sorted_res[0]['landmarks']))]
+            header = ["frame"] + [
+                f"x{i}" for i in range(len(sorted_res[0]["landmarks"]))
+            ]
             writer.writerow(header)
             for res in sorted_res:
-                row = [res['frame']] + res['landmarks']
+                row = [res["frame"]] + res["landmarks"]
                 writer.writerow(row)
 
         with transaction.atomic():
             job_update = VideoJob.objects.select_for_update().get(id=job_id)
-            with open(csv_path, 'rb') as f:
+            with open(csv_path, "rb") as f:
                 job_update.pose_data_file.save(
-                    os.path.basename(csv_path),
-                    ContentFile(f.read()), save=False
+                    os.path.basename(csv_path), ContentFile(f.read()), save=False
                 )
             job_update.status = VideoJob.JobStatus.POSE_DATA_GENERATED
             job_update.save()
@@ -50,5 +51,6 @@ def aggregate_results(self, results, job_id, workdir):
         except VideoJob.DoesNotExist:
             logger.error(f"VideoJob {job_id} missing when marking aggregation failure.")
         finally:
-            if os.path.isdir(workdir): shutil.rmtree(workdir, ignore_errors=True)
+            if os.path.isdir(workdir):
+                shutil.rmtree(workdir, ignore_errors=True)
         raise
