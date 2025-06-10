@@ -4,16 +4,25 @@ import os
 import logging
 from datetime import timedelta
 
-from celery import shared_task
+from celery import shared_task, group, chord, chain
 from django.utils import timezone
 from django.core.files.base import ContentFile
 from django.db import transaction
 from django.conf import settings  # Added for settings.MEDIA_ROOT
+import GPUtil
+import tempfile
+import shutil
+import csv
+import math
+import cv2
+import subprocess
 
 from .models import VideoJob, Video
 
 # Import your service functions here once they are created
 from .services import pose_extraction
+from .services.pose_extraction import NoPoseDataError, UnknownAlgorithmError, PoseExtractionError
+from .tasks.scatter import preprocess_and_scatter
 
 # Get an instance of a logger
 logger = logging.getLogger(__name__)
@@ -106,10 +115,20 @@ def video_to_pose_data_task(self, job_id):
             logger.info(
                 f"Job {job_id}: No reusable pose data found or failed to read. Generating new pose data."
             )
-            pose_data_csv_content = pose_extraction.generate_pose_data_csv(
-                job.input_video.file.path, job.pose_algorithm_id
-            )
-            reused_pose_data = False
+            try:
+                pose_data_csv_content = pose_extraction.generate_pose_data_csv(
+                    job.input_video.file.path, job.pose_algorithm_id
+                )
+                reused_pose_data = False
+            except NoPoseDataError as e:
+                logger.error(f"Job {job_id}: No pose data extracted: {e}")
+                with transaction.atomic():
+                    job_update = VideoJob.objects.select_for_update().get(id=job_id)
+                    job_update.status = VideoJob.JobStatus.FAILED
+                    job_update.error_message = str(e)
+                    job_update.save()
+                return
+            # Let other PoseExtractionError bubble to outer handler
 
         if pose_data_csv_content:
             file_name_base = f"{job.id}_posedata_v{job.pose_algorithm_id}.csv"
@@ -149,6 +168,20 @@ def video_to_pose_data_task(self, job_id):
             logger.error(
                 f"VideoJob {job_id} not found when trying to mark as FAILED after error."
             )
+
+
+@shared_task(bind=True, name="video_processing.video_to_pose_data_task_gpu")
+def video_to_pose_data_task_gpu(self, job_id):
+    logger.info(f"GPU task started for job {job_id}")
+    video_to_pose_data_task(job_id)
+
+
+# --- Scatter-Gather CPU Workflow ---
+
+@shared_task(bind=True, name="video_processing.video_to_pose_data_task_cpu")
+def video_to_pose_data_task_cpu(self, job_id):
+    logger.info(f"CPU scatter-gather starting for job {job_id}")
+    preprocess_and_scatter.delay(job_id)
 
 
 @shared_task(bind=True, name="video_processing.pose_data_to_armature_video_task")
@@ -227,3 +260,16 @@ def pose_data_to_armature_video_task(self, job_id):
             logger.error(
                 f"VideoJob {job_id} not found when trying to mark as FAILED after error."
             )
+
+
+def is_gpu_available():
+    return len(GPUtil.getAvailable()) > 0
+
+
+def dispatch_pose_extraction_task(job_id):
+    if is_gpu_available():
+        logger.info(f"Dispatching job {job_id} to GPU queue.")
+        video_to_pose_data_task_gpu.delay(job_id)
+    else:
+        logger.info(f"Dispatching job {job_id} to CPU queue.")
+        video_to_pose_data_task_cpu.delay(job_id)
