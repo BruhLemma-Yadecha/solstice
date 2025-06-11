@@ -5,19 +5,23 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('video_processing', '0002_videojob_error_message'),
+        ("video_processing", "0002_videojob_error_message"),
     ]
 
     operations = [
         migrations.RemoveField(
-            model_name='videojob',
-            name='output_video_path',
+            model_name="videojob",
+            name="output_video_path",
         ),
         migrations.AddField(
-            model_name='videojob',
-            name='output_video_file',
-            field=models.FileField(blank=True, help_text='Final processed output video file.', null=True, upload_to=apps.video_processing.models.get_output_video_upload_path),
+            model_name="videojob",
+            name="output_video_file",
+            field=models.FileField(
+                blank=True,
+                help_text="Final processed output video file.",
+                null=True,
+                upload_to=apps.video_processing.models.get_output_video_upload_path,
+            ),
         ),
     ]

@@ -42,15 +42,14 @@ def video_to_pose_data_task(self, job_id):
     If found, it reuses the data; otherwise, it generates new pose data.
     Then, it triggers the armature video generation task.
     """
+    task_start_time = timezone.now()
+    logger.info(f"Job {job_id}: Pose extraction task started")
+
     try:
-        # It's good practice to fetch the job within a transaction if you plan to update it.
-        # However, the main updates happen after potential I/O.
-        # For status updates during the process, select_for_update might be too broad.
-        # We'll use atomic transactions for specific save operations.
         job = VideoJob.objects.get(id=job_id)
 
         if not job.input_video:
-            logger.error(f"Job {job_id}: Input video not found.")
+            logger.error(f"Job {job_id}: Input video not found")
             with transaction.atomic():
                 job_update = VideoJob.objects.select_for_update().get(id=job_id)
                 job_update.status = VideoJob.JobStatus.FAILED
@@ -67,7 +66,7 @@ def video_to_pose_data_task(self, job_id):
         job.refresh_from_db()
 
         logger.info(
-            f"Starting pose extraction for job {job_id}, algorithm ID {job.pose_algorithm_id}, input video hash: {job.input_video.file_hash}"
+            f"Job {job_id}: Starting pose extraction (algorithm: {job.pose_algorithm_id}, hash: {job.input_video.file_hash})"
         )
 
         # Deduplication logic
@@ -98,7 +97,7 @@ def video_to_pose_data_task(self, job_id):
         ):  # Updated field name
             try:
                 logger.info(
-                    f"Job {job_id}: Found existing pose data from job {existing_pose_data_source_job.id}. Reusing."
+                    f"Job {job_id}: Reusing existing pose data from job {existing_pose_data_source_job.id}"
                 )
                 existing_pose_data_source_job.pose_data_file.open(
                     "rb"
@@ -110,15 +109,13 @@ def video_to_pose_data_task(self, job_id):
                 reused_pose_data = True
             except Exception as e:
                 logger.warning(
-                    f"Job {job_id}: Failed to read existing pose data from {existing_pose_data_source_job.id}. Will regenerate. Error: {e}"
+                    f"Job {job_id}: Failed to read existing pose data, will regenerate. Error: {e}"
                 )
                 pose_data_csv_content = None
                 reused_pose_data = False
 
         if not pose_data_csv_content:
-            logger.info(
-                f"Job {job_id}: No reusable pose data found or failed to read. Generating new pose data."
-            )
+            logger.info(f"Job {job_id}: Generating new pose data")
             try:
                 pose_data_csv_content = pose_extraction.generate_pose_data_csv(
                     job.input_video.file.path, job.pose_algorithm_id
@@ -145,9 +142,11 @@ def video_to_pose_data_task(self, job_id):
                 job_update.status = VideoJob.JobStatus.POSE_DATA_GENERATED
                 job_update.save()  # This save will also commit the file
             job.refresh_from_db()  # Refresh to get the saved file name
+
+            task_duration = timezone.now() - task_start_time
             logger.info(
-                f"Job {job_id}: Pose data CSV {'reused and ' if reused_pose_data else ''}saved as {job.pose_data_file.name}"
-            )  # Updated field name
+                f"Job {job_id}: Task completed in {task_duration.total_seconds():.1f}s ({'reused' if reused_pose_data else 'generated'} pose data)"
+            )
         else:
             raise ValueError("Pose data CSV content is empty or generation failed.")
 
@@ -176,7 +175,7 @@ def video_to_pose_data_task(self, job_id):
 
 @shared_task(bind=True, name="video_processing.video_to_pose_data_task_gpu")
 def video_to_pose_data_task_gpu(self, job_id):
-    logger.info(f"GPU task started for job {job_id}")
+    logger.info(f"Job {job_id}: Dispatched to GPU queue")
     video_to_pose_data_task(job_id)
 
 
@@ -185,8 +184,24 @@ def video_to_pose_data_task_gpu(self, job_id):
 
 @shared_task(bind=True, name="video_processing.video_to_pose_data_task_cpu")
 def video_to_pose_data_task_cpu(self, job_id):
-    logger.info(f"CPU scatter-gather starting for job {job_id}")
-    preprocess_and_scatter.delay(job_id)
+    task_start_time = timezone.now()
+    logger.info(f"Job {job_id}: CPU scatter-gather task started")
+
+    try:
+        result = preprocess_and_scatter.delay(job_id)
+        result.get()  # Wait for the scatter task to complete
+
+        task_duration = timezone.now() - task_start_time
+        logger.info(
+            f"Job {job_id}: CPU scatter-gather task completed in {task_duration.total_seconds():.1f}s"
+        )
+        return result
+    except Exception as e:
+        task_duration = timezone.now() - task_start_time
+        logger.error(
+            f"Job {job_id}: CPU scatter-gather task failed after {task_duration.total_seconds():.1f}s: {e}"
+        )
+        raise
 
 
 @shared_task(bind=True, name="video_processing.pose_data_to_armature_video_task")
@@ -194,6 +209,9 @@ def pose_data_to_armature_video_task(self, job_id):
     """
     Celery task to generate the final armature video from pose data CSV.
     """
+    task_start_time = timezone.now()
+    logger.info(f"Job {job_id}: Armature video task started")
+
     try:
         job = VideoJob.objects.get(id=job_id)  # Fetch job at the beginning
 
@@ -215,9 +233,7 @@ def pose_data_to_armature_video_task(self, job_id):
             job_update.save()
         job.refresh_from_db()
 
-        logger.info(
-            f"Starting armature video generation for job {job_id} from {job.pose_data_file.path}"
-        )  # Updated field name
+        logger.info(f"Job {job_id}: Generating armature video from pose data")
 
         # output_video_file_path = armature_video_service.generate_video_from_pose_data(
         #     job.pose_data_file.path, # Updated field name

@@ -17,14 +17,26 @@ def aggregate_results(self, results, job_id, workdir):
     Reduce phase: combine per-frame landmarks into CSV, save to VideoJob, and clean up.
     """
     try:
+        if not results:
+            raise ValueError("No results to aggregate")
+
         sorted_res = sorted(results, key=lambda r: r["frame"])
         csv_path = os.path.join(workdir, f"{job_id}_pose_results.csv")
+
         with open(csv_path, "w", newline="") as csvfile:
             writer = csv.writer(csvfile)
-            header = ["frame"] + [
-                f"x{i}" for i in range(len(sorted_res[0]["landmarks"]))
-            ]
+
+            # Check if we have landmarks to determine header
+            if sorted_res and sorted_res[0]["landmarks"]:
+                header = ["frame"] + [
+                    f"landmark_{i // 3}_{['x', 'y', 'z'][i % 3]}"
+                    for i in range(len(sorted_res[0]["landmarks"]))
+                ]
+            else:
+                header = ["frame"]  # Minimal header if no landmarks
+
             writer.writerow(header)
+
             for res in sorted_res:
                 row = [res["frame"]] + res["landmarks"]
                 writer.writerow(row)

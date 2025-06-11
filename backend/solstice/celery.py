@@ -20,6 +20,9 @@ app.conf.task_queues = (
 app.conf.task_routes = {
     "video_processing.video_to_pose_data_task_gpu": {"queue": "gpu_queue"},
     "video_processing.video_to_pose_data_task_cpu": {"queue": "cpu_queue"},
+    "video_processing.preprocess_and_scatter": {"queue": "cpu_queue"},
+    "video_processing.process_frame": {"queue": "cpu_queue"},
+    "video_processing.aggregate_results": {"queue": "cpu_queue"},
 }
 
 
