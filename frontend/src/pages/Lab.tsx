@@ -37,9 +37,16 @@ export const Lab = () => {
         let cancelled = false;
         let pollTimeout: NodeJS.Timeout;
 
+        // Always try to get job_id from localStorage
+        const jobId = localStorage.getItem("video_job_id");
+
         const pollLatest = async () => {
             try {
-                const res = await fetch("http://127.0.0.1:8000/video/latest/");
+                let url = "http://127.0.0.1:8000/video/latest/";
+                if (jobId) {
+                    url += `?job_id=${jobId}`;
+                }
+                const res = await fetch(url);
                 const data = await res.json();
                 if (data.video1 && data.csv_url) {
                     if (!cancelled) {
@@ -48,12 +55,12 @@ export const Lab = () => {
                         if (data.video_id) setVideoId(data.video_id);
                     }
                 } else {
-                    // Not ready, poll again after 1s
-                    pollTimeout = setTimeout(pollLatest, 1000);
+                    // Not ready, poll again after 5s
+                    pollTimeout = setTimeout(pollLatest, 5000);
                 }
             } catch {
-                // On error, poll again after 2s
-                pollTimeout = setTimeout(pollLatest, 2000);
+                // On error, poll again after 5s
+                pollTimeout = setTimeout(pollLatest, 5000);
             }
         };
 
@@ -230,13 +237,18 @@ export const Lab = () => {
         setCurrentTime(time);
     };
 
-    // Delete video handler
+    // Delete video or job handler
     const handleDeleteVideo = () => {
         if (!videoId) {
             alert("No video ID found.");
             return;
         }
-        fetch(`http://127.0.0.1:8000/video/videos/${videoId}/delete/`, {
+        const jobId = localStorage.getItem("video_job_id");
+        let url = `http://127.0.0.1:8000/video/videos/${videoId}/delete/`;
+        if (jobId) {
+            url += `?job_id=${jobId}`;
+        }
+        fetch(url, {
             method: "DELETE",
             headers: {
                 "Content-Type": "application/json",
@@ -244,14 +256,14 @@ export const Lab = () => {
         })
             .then((response) => {
                 if (response.ok) {
-                    alert("Video deleted successfully");
+                    alert("Deleted successfully");
                     navigate("/");
                 } else {
-                    alert("Error deleting video");
+                    alert("Error deleting");
                 }
             })
             .catch((error) => {
-                alert("Error deleting video: " + error);
+                alert("Error deleting: " + error);
             });
     };
 
@@ -261,7 +273,12 @@ export const Lab = () => {
             alert("No video ID found.");
             return;
         }
-        fetch(`http://127.0.0.1:8000/video/videos/${videoId}/regenerate-csv/`, {
+        const jobId = localStorage.getItem("video_job_id");
+        let url = `http://127.0.0.1:8000/video/videos/${videoId}/regenerate-csv/`;
+        if (jobId) {
+            url += `?job_id=${jobId}`;
+        }
+        fetch(url, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
@@ -410,6 +427,15 @@ export const Lab = () => {
                 </motion.button>
                 <motion.button
                     className="back-button"
+                    onClick={() => window.location.reload()}
+                    whileHover={{ scale: 1.05, boxShadow: "8px 8px #00bcd4", color: "#fff" }}
+                    whileTap={{ scale: 0.95, boxShadow: "4px 3px #00bcd4" }}
+                    style={{ color: "#00bcd4", backgroundColor: "transparent", border: "none", cursor: "pointer", boxShadow: "0 2px 0px #00bcd4" }}
+                >
+                    Reload Page
+                </motion.button>
+                <motion.button
+                    className="back-button"
                     onClick={() => setStatus(!status)}
                     whileHover={{ scale: 1.05, boxShadow: "8px 8px #00bcd4", color: "#fff" }}
                     whileTap={{ scale: 0.95, boxShadow: "4px 3px #00bcd4" }}
@@ -425,6 +451,15 @@ export const Lab = () => {
                     style={{ color: "#00bcd4", backgroundColor: "transparent", border: "none", cursor: "pointer", margin: "auto", boxShadow: "0 2px 0px #00bcd4" }}
                 >
                     Videos
+                </motion.button>
+                <motion.button
+                    className="back-button"
+                    onClick={() => navigate("/jobs")}
+                    whileHover={{ scale: 1.05, boxShadow: "8px 8px #00bcd4" }}
+                    whileTap={{ scale: 0.95, boxShadow: "4px 3px #00bcd4" }}
+                    style={{ color: "#00bcd4", backgroundColor: "transparent", border: "none", cursor: "pointer", margin: "auto", boxShadow: "0 2px 0px #00bcd4" }}
+                >
+                    Jobs
                 </motion.button>
             </div>
         </motion.div>

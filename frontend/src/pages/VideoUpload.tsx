@@ -119,6 +119,15 @@ const VideoUpload = () => {
         >
             Videos
         </motion.button>
+        <motion.button
+            className="back-button"
+            onClick={() => navigate("/jobs")}
+            whileHover={{ scale: 1.05, boxShadow: "8px 8px #00bcd4" }}
+            whileTap={{ scale: 0.95, boxShadow: "4px 3px #00bcd4" }}
+            style={{ color: "#00bcd4", backgroundColor: "transparent", border: "none", cursor: "pointer", margin: "auto", boxShadow: "0 2px 0px #00bcd4" }}
+        >
+            Jobs
+        </motion.button>
       </div>
     </>
   );

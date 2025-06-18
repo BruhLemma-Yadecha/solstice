@@ -1,10 +1,10 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import React from "react";
 
 import { Lab } from "./pages/Lab";
 import VideoUpload from "./pages/VideoUpload";
 import StatusPage from "./pages/status";
 import ListVideo from "./pages/videos"
+import JobList from "./pages/JobList";
 
 function App() {
   return (
@@ -14,6 +14,7 @@ function App() {
         <Route path="/lab" element={<Lab />} />
         <Route path="/status" element={<StatusPage />} />
         <Route path="/videos" element={<ListVideo />} />
+        <Route path="/jobs" element={<JobList />} />
       </Routes>
     </Router>
   );

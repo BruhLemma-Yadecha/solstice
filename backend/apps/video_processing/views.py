@@ -14,7 +14,7 @@ from .serializers import (
     VideoJobCreateSerializer,
     VideoJobDetailSerializer,
 )
-from .services.utilities import delete_csv
+from .services.utilities import delete_csv, delete_norm_csv
 
 from .tasks import video_to_pose_data_task, dispatch_pose_extraction_task
 
@@ -201,10 +201,37 @@ class JobStatusAPIView(APIView):
 
 class LatestVideoAndCSVAPIView(APIView):
     """
-    API View to get the latest processed video and its pose CSV.
+    API View to get the latest processed video and its pose CSV,
+    or for a specific job if job_id is provided as a query param.
     """
 
     def get(self, request, *args, **kwargs):
+        job_id = request.query_params.get("job_id")
+        if job_id:
+            try:
+                job = VideoJob.objects.get(id=job_id)
+            except VideoJob.DoesNotExist:
+                return Response(
+                    {"detail": "Job not found."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            if not job.pose_data_file:
+                return Response(
+                    {"detail": "CSV not ready for this job."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+            video_url = request.build_absolute_uri(job.input_video.file.url)
+            csv_url = request.build_absolute_uri(job.pose_data_file.url)
+            norm_csv_url = request.build_absolute_uri(job.norm_pose_data_file.url)
+            video_id = job.input_video.id
+            return Response({
+                "video1": video_url,
+                "csv_url": csv_url,
+                "norm_csv_url": norm_csv_url,
+                "video_id": video_id,
+            }, status=status.HTTP_200_OK)
+
         # Find the latest VideoJob with a completed pose CSV
         latest_job = (
             VideoJob.objects.filter(pose_data_file__isnull=False)
@@ -219,25 +246,25 @@ class LatestVideoAndCSVAPIView(APIView):
 
         video_url = request.build_absolute_uri(latest_job.input_video.file.url)
         csv_url = request.build_absolute_uri(latest_job.pose_data_file.url)
+        norm_csv_url = request.build_absolute_uri(latest_job.norm_pose_data_file.url)
         video_id = latest_job.input_video.id
-        return Response(
-            {
-                "video1": video_url,
-                "csv_url": csv_url,
-                "video_id": video_id,
-            },
-            status=status.HTTP_200_OK,
-        )
+        return Response({
+            "video1": video_url,
+            "csv_url": csv_url,
+            "norm_csv_url": norm_csv_url,
+            "video_id": video_id,
+        }, status=status.HTTP_200_OK)
 
 
 # video deletion endpoint
 class VideoDeleteAPIView(APIView):
     """
-    API View to delete a video and its associated jobs.
+    API View to delete a video and its associated jobs, or a specific job if job_id is provided.
+    If no job_id is given, only the latest job for the video is deleted.
     """
 
     def delete(self, request, video_id, *args, **kwargs):
-        # Find video or return 404
+        job_id = request.query_params.get("job_id")
         try:
             video = Video.objects.get(id=video_id)
         except Video.DoesNotExist:
@@ -246,61 +273,96 @@ class VideoDeleteAPIView(APIView):
                 {"detail": "Video not found."}, status=status.HTTP_404_NOT_FOUND
             )
 
-        # Delete all jobs and their files (signals handle cleanup)
-        jobs_qs = VideoJob.objects.filter(input_video=video)
-        deleted_count, _ = jobs_qs.delete()
-        logger.info(f"Deleted {deleted_count} jobs associated with video {video.id}")
-
-        # Delete the video record and file (signal handles file cleanup)
-        video.delete()
-        logger.info(f"Video {video.id} deleted successfully")
-
-        return Response(
-            {"detail": "Video and associated jobs deleted successfully."},
-            status=status.HTTP_204_NO_CONTENT,
-        )
-
+        if job_id:
+            # Delete only the specific job and its CSV
+            try:
+                video_job = VideoJob.objects.get(id=job_id, input_video=video)
+            except VideoJob.DoesNotExist:
+                return Response(
+                    {"detail": "Job not found for this video."}, status=status.HTTP_404_NOT_FOUND
+                )
+            delete_csv(video_job.pose_data_file)
+            delete_norm_csv(video_job.norm_pose_data_file)
+            video_job.delete()
+            logger.info(f"Deleted job {job_id} and its CSV for video {video.id}")
+            # If no more jobs exist for this video, delete the video file
+            if not VideoJob.objects.filter(input_video=video).exists():
+                video.delete()
+                logger.info(f"Video {video.id} deleted as it had no more jobs")
+            return Response(
+                {"detail": "Job and associated CSV deleted successfully."},
+                status=status.HTTP_204_NO_CONTENT,
+            )
+        else:
+            # Delete only the latest job for this video
+            latest_job = (
+                VideoJob.objects.filter(input_video=video)
+                .order_by("-created_at")
+                .first()
+            )
+            if not latest_job:
+                return Response(
+                    {"detail": "No jobs found for this video."}, status=status.HTTP_404_NOT_FOUND
+                )
+            delete_csv(latest_job.pose_data_file)
+            delete_norm_csv(latest_job.norm_pose_data_file)
+            latest_job.delete()
+            logger.info(f"Deleted latest job and its CSV for video {video.id}")
+            # If no more jobs exist for this video, delete the video file
+            if not VideoJob.objects.filter(input_video=video).exists():
+                video.delete()
+                logger.info(f"Video {video.id} deleted as it had no more jobs")
+            return Response(
+                {"detail": "Latest job and associated CSV deleted successfully."},
+                status=status.HTTP_204_NO_CONTENT,
+            )
 
 # for regenerate the csv
 class VideoRegenerateCSVAPIView(APIView):
     """
-    API View to regenerate the pose CSV for a specific video.
+    API View to regenerate the pose CSV for a specific job, or for the latest job if no job_id is given.
     """
 
     def post(self, request, video_id, *args, **kwargs):
+        job_id = request.query_params.get("job_id")
         try:
             video = Video.objects.get(id=video_id)
         except Video.DoesNotExist:
-            logger.warning(
-                f"Regenerate CSV request for non-existent video_id: {video_id}"
-            )
-            return Response(
-                {"detail": "Video not found."}, status=status.HTTP_404_NOT_FOUND
-            )
+            logger.warning(f"Regenerate CSV request for non-existent video_id: {video_id}")
+            return Response({"detail": "Video not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        # Find the latest job for this video
-        try:
-            job = VideoJob.objects.filter(input_video=video).latest("created_at")
-        except VideoJob.DoesNotExist:
-            return Response(
-                {"detail": "No job found for this video."},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-
-        # Create a new VideoJob for CSV regeneration
-        with transaction.atomic():
-            new_job = VideoJob.objects.create(
-                input_video=video,
-                pose_algorithm_id=job.pose_algorithm_id,
-                status=VideoJob.JobStatus.UPLOADED,
-            )
-            dispatch_pose_extraction_task(new_job.id)
+        if job_id:
+            # Regenerate for a specific job
+            try:
+                video_job = VideoJob.objects.get(id=job_id, input_video=video)
+            except VideoJob.DoesNotExist:
+                return Response(
+                    {"detail": "Job not found for this video."}, status=status.HTTP_404_NOT_FOUND
+                )
+            delete_csv(video_job.pose_data_file)
+            delete_norm_csv(video_job.norm_pose_data_file)
+            video_to_pose_data_task.delay(str(video_job.id))
             logger.info(
-                f"CSV regeneration job created: {new_job.id} for video {video.id}"
+                f"Celery task video_to_pose_data_task dispatched for job {video_job.id}"
             )
-        serializer = VideoJobDetailSerializer(new_job, context={"request": request})
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
-
+        else:
+            # Regenerate for the latest job of this video
+            latest_job = (
+                VideoJob.objects.filter(input_video=video)
+                .order_by("-created_at")
+                .first()
+            )
+            if not latest_job:
+                return Response(
+                    {"detail": "No jobs found for this video."}, status=status.HTTP_404_NOT_FOUND
+                )
+            delete_csv(latest_job.pose_data_file)
+            delete_norm_csv(latest_job.norm_pose_data_file)
+            video_to_pose_data_task.delay(str(latest_job.id))
+            logger.info(
+                f"Celery task video_to_pose_data_task dispatched for latest job {latest_job.id} of video {video.id}"
+            )
+        return Response({"detail": "CSV regeneration initiated."}, status=status.HTTP_202_ACCEPTED)
 
 class VideoListAPIView(APIView):
     """
@@ -311,3 +373,23 @@ class VideoListAPIView(APIView):
         videos = Video.objects.all()
         serializer = VideoSerializer(videos, many=True, context={"request": request})
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+class JobListAPIView(APIView):
+    """
+    API View to list all jobs and their status.
+    """
+    def get(self, request, *args, **kwargs):
+        jobs = VideoJob.objects.select_related("input_video").all().order_by("-created_at")
+        data = []
+        for job in jobs:
+            data.append({
+                "id": str(job.id),
+                "status": job.status,
+                "created_at": job.created_at.isoformat(),
+                "pose_data_file": request.build_absolute_uri(job.pose_data_file.url) if job.pose_data_file else None,
+                "input_video": {
+                    "id": str(job.input_video.id),
+                    "file": request.build_absolute_uri(job.input_video.file.url) if job.input_video and job.input_video.file else "",
+                },
+            })
+        return Response(data, status=status.HTTP_200_OK)

@@ -91,7 +91,7 @@ const ListVideo = () => {
           </motion.div>
         ))}
       </div>
-      <div style={{ marginTop: "3rem", alignContent: "center", display: "flex", justifyContent: "center", flexDirection: "column", gap: "1rem", margin:"auto", alignItems: "center" }}>
+      <div style={{ marginTop: "2rem", alignContent: "center", display: "flex", justifyContent: "center", flexDirection: "column", gap: "2rem", margin:"auto", alignItems: "center" }}>
         <div>
             <motion.button
                 className="back-button"

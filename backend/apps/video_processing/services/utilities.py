@@ -14,3 +14,11 @@ def delete_csv(csv_filepath):
     except Exception as e:
         logger.error(f"Error deleting CSV file {csv_file_path}: {e}")
         return False
+
+def delete_norm_csv(norm_csv_filepath):
+    try:
+        norm_csv_file_path = norm_csv_filepath.name
+        default_storage.delete(norm_csv_file_path)
+    except Exception as e:
+        logger.error(f"Error deleting normalized CSV file {norm_csv_file_path}: {e}")
+        return False
