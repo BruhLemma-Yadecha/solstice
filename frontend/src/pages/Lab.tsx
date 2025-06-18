@@ -17,6 +17,7 @@ type FramePoints = { [frame: number]: ({ x: number; y: number } | null)[] };
 export const Lab = () => {
     const [videoUrl, setVideoUrl] = useState<string>("");
     const [csvUrl, setCsvUrl] = useState<string>("");
+    const [normCsvUrl, setNormCsvUrl] = useState<string>("");
     const [videoId, setVideoId] = useState<string>("");
     const [frames, setFrames] = useState<FramePoints>({});
     const [isPlaying, setIsPlaying] = useState(false);
@@ -31,6 +32,7 @@ export const Lab = () => {
     const navigate = useNavigate();
     const videoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
+    const canvasRef2 = useRef<HTMLCanvasElement>(null);
 
     // Poll /latest/ until both video1 and csv_url are available
     useEffect(() => {
@@ -52,6 +54,7 @@ export const Lab = () => {
                     if (!cancelled) {
                         setVideoUrl(data.video1);
                         setCsvUrl(data.csv_url);
+                        setNormCsvUrl(data.norm_csv_url);
                         if (data.video_id) setVideoId(data.video_id);
                     }
                 } else {
@@ -71,6 +74,38 @@ export const Lab = () => {
             if (pollTimeout) clearTimeout(pollTimeout);
         };
     }, [csvReloadKey]);
+
+    useEffect(() => {
+        if (!normCsvUrl) return;
+        fetch(normCsvUrl)
+            .then(res => res.text())
+            .then(csvText => {
+                Papa.parse(csvText, {
+                    header: true,
+                    complete: (results: Papa.ParseResult<any>) => {
+                        const grouped: FramePoints = {};
+                        (results.data as any[]).forEach((row: any) => {
+                            const frameIdx = parseInt(row.frame, 10);
+                            const points: ({ x: number; y: number } | null)[] = new Array(33).fill(null);
+                            for (let i = 0; i < 33; i++) {
+                                const xKey = `landmark_${i}_x`;
+                                const yKey = `landmark_${i}_y`;
+                                const xVal = parseFloat(row[xKey]);
+                                const yVal = parseFloat(row[yKey]);
+                                if (!isNaN(xVal) && !isNaN(yVal)) {
+                                    points[i] = { x: xVal, y: yVal };
+                                }
+                            }
+                            grouped[frameIdx] = points;
+                        });
+                        setFrames(grouped);
+                    }
+                });
+            })
+            .catch(err => {
+                console.error("Error fetching or parsing norm CSV:", err);
+            });
+    }, [normCsvUrl]);
 
     // Fetch and parse CSV into a mapping from frame number → 33-length array of {x,y} or null
     useEffect(() => {
@@ -170,6 +205,77 @@ export const Lab = () => {
             }
         });
     }, [currentTime, frames, ex]);
+
+    // Draw normalized stick figure on second canvas
+    useEffect(() => {
+        if (!canvasRef2.current || !videoRef.current) return;
+        if (!normCsvUrl) return;
+        const canvas = canvasRef2.current;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        const fps = 30;
+        const relativeTime = currentTime - ex;
+        if (relativeTime < 0) return;
+        const currentFrame = relativeTime * fps;
+        const prevIdx = Math.floor(currentFrame);
+        const nextIdx = Math.ceil(currentFrame);
+        const alpha = currentFrame - prevIdx;
+
+        // Use frames from normalized CSV
+        const prevPoints = frames[prevIdx] || new Array(33).fill(null);
+        const nextPoints = frames[nextIdx] || new Array(33).fill(null);
+
+        // Interpolate between prev and next points
+        const interpolatedPoints: ({ x: number; y: number } | null)[] = prevPoints.map((pt, i) => {
+            const ptNext = nextPoints[i];
+            if (pt && ptNext) {
+                return {
+                    x: pt.x * (1 - alpha) + ptNext.x * alpha,
+                    y: pt.y * (1 - alpha) + ptNext.y * alpha,
+                };
+            } else if (pt) {
+                return pt;
+            } else if (ptNext) {
+                return ptNext;
+            }
+            return null;
+        });
+
+        // Same skeleton as above
+        const skeleton: [number, number][] = [
+            [0, 1], [1, 2], [2, 3], [3, 7],
+            [0, 4], [4, 5], [5, 6], [6, 8],
+            [9, 10], [11, 12], [11, 13], [13, 15],
+            [12, 14], [14, 16], [11, 23], [12, 24],
+            [23, 25], [25, 27], [24, 26], [26, 28],
+            [27, 29], [29, 31], [28, 30], [30, 32],
+        ];
+
+        ctx.strokeStyle = "#ff9800";
+        ctx.lineWidth = 2;
+
+        skeleton.forEach(([a, b]) => {
+            const ptA = interpolatedPoints[a];
+            const ptB = interpolatedPoints[b];
+            if (ptA && ptB) {
+                ctx.beginPath();
+                ctx.moveTo(ptA.x * canvas.width, ptA.y * canvas.height);
+                ctx.lineTo(ptB.x * canvas.width, ptB.y * canvas.height);
+                ctx.stroke();
+            }
+        });
+
+        ctx.fillStyle = "#ff9800";
+        interpolatedPoints.forEach((pt) => {
+            if (pt) {
+                ctx.beginPath();
+                ctx.arc(pt.x * canvas.width, pt.y * canvas.height, 3, 0, 2 * Math.PI);
+                ctx.fill();
+            }
+        });
+    }, [currentTime, frames, ex, normCsvUrl]);
 
     // Play/Pause video when isPlaying or videosReady changes
     useEffect(() => {
@@ -317,7 +423,7 @@ export const Lab = () => {
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: 0.3, duration: 0.6 }}
-                style={{ display: "flex", gap: "2rem", justifyContent: "center" }}
+                style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "1.5rem", justifyContent: "center" }}
             >
                 <motion.video
                     ref={videoRef}
@@ -332,20 +438,34 @@ export const Lab = () => {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.4, duration: 0.5 }}
                     whileHover={{ scale: 1.03, boxShadow: "0 4px 32px #00bcd4" }}
-                    width={400}
-                    height={300}
+                    width={300}
+                    height={225}
                 />
-                <motion.canvas
-                    ref={canvasRef}
-                    className="lab-video"
-                    initial={{ opacity: 0, y: 30 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.4, duration: 0.5 }}
-                    whileHover={{ scale: 1.03, boxShadow: "0 4px 32px #00bcd4" }}
-                    width={400}
-                    height={300}
-                    style={{ background: "#222", borderRadius: "1rem" }}
-                />
+                <div style={{ display: "flex", flexDirection: "row", gap: "2rem", justifyContent: "center" }}>
+                    <motion.canvas
+                        ref={canvasRef}
+                        className="lab-video"
+                        initial={{ opacity: 0, y: 30 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.4, duration: 0.5 }}
+                        whileHover={{ scale: 1.03, boxShadow: "0 4px 32px #00bcd4" }}
+                        width={300}
+                        height={225}
+                        style={{ background: "#222", borderRadius: "1rem" }}
+                    />
+                    {/* Normalized CSV canvas */}
+                    <motion.canvas
+                        ref={canvasRef2}
+                        className="lab-video"
+                        initial={{ opacity: 0, y: 30 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.4, duration: 0.5 }}
+                        whileHover={{ scale: 1.03, boxShadow: "0 4px 32px #ff9800" }}
+                        width={300}
+                        height={225}
+                        style={{ background: "#222", borderRadius: "1rem" }}
+                    />
+                </div>
             </motion.div>
             <motion.div
                 className="lab-controls"
