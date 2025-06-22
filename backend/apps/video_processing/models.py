@@ -122,7 +122,7 @@ def get_norm_pose_data_upload_path(instance, filename):
     Generates a unique upload path for normalized pose data CSVs.
     The `filename` argument is the name passed to the `save()` method.
     """
-    return os.path.join("intermediate_data", "norm_pose_csvs", filename)
+    return os.path.join("artifacts", "normalized_pose_estimations", filename)
 
 
 class VideoJob(models.Model):

@@ -163,6 +163,7 @@ os.makedirs(MEDIA_ROOT, exist_ok=True)
 MEDIA_SUBDIRECTORIES = [
     "ingest/videos",
     "artifacts/pose_estimations",
+    "artifacts/normalized_pose_estimations",
     "deliverables/videos",
     "deliverables/thumbnails",
     "temp",
