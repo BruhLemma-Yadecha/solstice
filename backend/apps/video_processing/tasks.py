@@ -25,9 +25,7 @@ logger = logging.getLogger(__name__)
 def video_to_pose_data_task(self, job_id):
     """
     Celery task to extract pose data from an input video.
-    It checks for existing pose data from a previous identical job (same video hash & pose algorithm id).
-    If found, it reuses the data; otherwise, it generates new pose data.
-    Then, it triggers the armature video generation task.
+    It generates new pose data and then triggers the normalization task.
     """
     task_start_time = timezone.now()
     logger.info(f"Job {job_id}: Pose extraction task started")
@@ -56,68 +54,22 @@ def video_to_pose_data_task(self, job_id):
             f"Job {job_id}: Starting pose extraction (algorithm: {job.pose_algorithm_id}, hash: {job.input_video.file_hash})"
         )
 
-        # Deduplication logic
-        existing_pose_data_source_job = (
-            VideoJob.objects.filter(
-                input_video__file_hash=job.input_video.file_hash,
-                pose_algorithm_id=job.pose_algorithm_id,  # Updated field name
-                status__in=[
-                    VideoJob.JobStatus.POSE_DATA_GENERATED,
-                    VideoJob.JobStatus.ARMATURE_VIDEO_QUEUED,
-                    VideoJob.JobStatus.GENERATING_ARMATURE_VIDEO,
-                    VideoJob.JobStatus.COMPLETED,
-                ],
-                pose_data_file__isnull=False,  # Updated field name
+        # Always generate new pose data, deduplication is removed for simplicity.
+        logger.info(f"Job {job_id}: Generating new pose data")
+        try:
+            pose_data_csv_content = generate_pose_data_csv(
+                job.input_video.file.path,
+                job.pose_algorithm_id,
             )
-            .exclude(id=job.id)
-            .exclude(pose_data_file__exact="")
-            .order_by("-created_at")
-            .first()
-        )
-
-        pose_data_csv_content = None
-        reused_pose_data = False
-
-        if (
-            existing_pose_data_source_job
-            and existing_pose_data_source_job.pose_data_file.name
-        ):  # Updated field name
-            try:
-                logger.info(
-                    f"Job {job_id}: Reusing existing pose data from job {existing_pose_data_source_job.id}"
-                )
-                existing_pose_data_source_job.pose_data_file.open(
-                    "rb"
-                )  # Updated field name
-                pose_data_csv_content = (
-                    existing_pose_data_source_job.pose_data_file.read()
-                )  # Updated field name
-                existing_pose_data_source_job.pose_data_file.close()  # Updated field name
-                reused_pose_data = True
-            except Exception as e:
-                logger.warning(
-                    f"Job {job_id}: Failed to read existing pose data, will regenerate. Error: {e}"
-                )
-                pose_data_csv_content = None
-                reused_pose_data = False
-
-        if not pose_data_csv_content:
-            logger.info(f"Job {job_id}: Generating new pose data")
-            try:
-                pose_data_csv_content = generate_pose_data_csv(
-                    job.input_video.file.path,
-                    job.pose_algorithm_id,
-                )
-                reused_pose_data = False
-            except NoPoseDataError as e:
-                logger.error(f"Job {job_id}: No pose data extracted: {e}")
-                with transaction.atomic():
-                    job_update = VideoJob.objects.select_for_update().get(id=job_id)
-                    job_update.status = VideoJob.JobStatus.FAILED
-                    job_update.error_message = str(e)
-                    job_update.save()
-                return
-            # Let other PoseExtractionError bubble to outer handler
+        except NoPoseDataError as e:
+            logger.error(f"Job {job_id}: No pose data extracted: {e}")
+            with transaction.atomic():
+                job_update = VideoJob.objects.select_for_update().get(id=job_id)
+                job_update.status = VideoJob.JobStatus.FAILED
+                job_update.error_message = str(e)
+                job_update.save()
+            return
+        # Let other PoseExtractionError bubble to outer handler
 
         if pose_data_csv_content:
             file_name_base = f"{job.id}_posedata_v{job.pose_algorithm_id}.csv"
@@ -126,7 +78,7 @@ def video_to_pose_data_task(self, job_id):
                 job_update = VideoJob.objects.select_for_update().get(id=job_id)
                 job_update.pose_data_file.save(
                     file_name_base, ContentFile(pose_data_csv_content), save=False
-                )  # Updated field name
+                )
                 job_update.status = VideoJob.JobStatus.POSE_DATA_GENERATED
                 job_update.save()  # This save will also commit the file
             job.refresh_from_db()
@@ -135,7 +87,7 @@ def video_to_pose_data_task(self, job_id):
 
         task_duration = timezone.now() - task_start_time
         logger.info(
-            f"Job {job_id}: Task completed in {task_duration.total_seconds():.1f}s ({'reused' if reused_pose_data else 'generated'} pose data)"
+            f"Job {job_id}: Task completed in {task_duration.total_seconds():.1f}s (generated pose data)"
         )
     except VideoJob.DoesNotExist:
         logger.error(f"VideoJob with id {job_id} not found for pose extraction.")
@@ -197,13 +149,15 @@ def pose_data_to_armature_video_task(self, job_id):
     try:
         job = VideoJob.objects.get(id=job_id)  # Fetch job at the beginning
 
-        if not job.pose_data_file or not job.pose_data_file.name:  # Updated field name
-            logger.error(f"Job {job_id}: Intermediate pose data CSV not found.")
+        if (
+            not job.norm_pose_data_file or not job.norm_pose_data_file.name
+        ):  # Updated field name
+            logger.error(f"Job {job_id}: Intermediate normalized pose data CSV not found.")
             with transaction.atomic():
                 job_update = VideoJob.objects.select_for_update().get(id=job_id)
                 job_update.status = VideoJob.JobStatus.FAILED
                 job_update.error_message = (
-                    "Intermediate pose data CSV missing for armature video generation."
+                    "Intermediate normalized pose data CSV missing for armature video generation."
                 )
                 job_update.save()
             return
@@ -218,7 +172,7 @@ def pose_data_to_armature_video_task(self, job_id):
         logger.info(f"Job {job_id}: Generating armature video from pose data")
 
         # output_video_file_path = armature_video_service.generate_video_from_pose_data(
-        #     job.pose_data_file.path, # Updated field name
+        #     job.norm_pose_data_file.path, # Updated field name
         #     job.input_video.file.path if job.input_video else None
         # )
 
@@ -301,6 +255,8 @@ def normalize_pose_data_task(self, job_id):
 
         elapsed = (timezone.now() - start).total_seconds()
         logger.info(f"Job {job_id}: Normalization done in {elapsed:.1f}s")
+        # Defer triggering the next task until after the transaction commits
+        transaction.on_commit(lambda: pose_data_to_armature_video_task.delay(job_id))
     except VideoJob.DoesNotExist:
         logger.error(f"VideoJob {job_id} not found for normalization.")
     except Exception as e:

@@ -104,12 +104,9 @@ class Video(models.Model):
 def get_pose_data_upload_path(instance, filename):
     """
     Generates a unique upload path for intermediate pose data CSVs.
-    Filename will be <job_id>_posedata_v<version>.csv.
+    The `filename` argument is the name passed to the `save()` method.
     """
-    job_id = instance.id if instance.id else uuid.uuid4()
-    # The 'filename' argument might be the original, but we enforce our own.
-    new_filename = f"{job_id}_posedata.csv"
-    return os.path.join("artifacts", "pose_estimations", new_filename)
+    return os.path.join("artifacts", "pose_estimations", filename)
 
 
 def get_output_video_upload_path(instance, filename):
@@ -123,12 +120,9 @@ def get_output_video_upload_path(instance, filename):
 def get_norm_pose_data_upload_path(instance, filename):
     """
     Generates a unique upload path for normalized pose data CSVs.
-    Filename will be <job_id>_normposedata_v<version>.csv.
+    The `filename` argument is the name passed to the `save()` method.
     """
-    job_id = instance.id if instance.id else uuid.uuid4()
-    # The 'filename' argument might be the original, but we enforce our own.
-    new_filename = f"{job_id}_normposedata.csv"
-    return os.path.join("intermediate_data", "norm_pose_csvs", new_filename)
+    return os.path.join("intermediate_data", "norm_pose_csvs", filename)
 
 
 class VideoJob(models.Model):
