@@ -1,31 +1,18 @@
 # apps/video_processing/tasks.py
 
 import os
+import GPUtil  # restore for GPU availability check
 import logging
-from datetime import timedelta
-
-from celery import shared_task, group, chord, chain
+from celery import shared_task
 from django.utils import timezone
 from django.core.files.base import ContentFile
 from django.db import transaction
-from django.conf import settings  # Added for settings.MEDIA_ROOT
-import GPUtil
-import tempfile
-import shutil
-import csv
-import math
-import cv2
-import subprocess
+from django.conf import settings
 
-from .models import VideoJob, Video
-
-# Import your service functions here once they are created
-from .services import pose_extraction
-from .services.pose_extraction import (
-    NoPoseDataError,
-    UnknownAlgorithmError,
-    PoseExtractionError,
-)
+# Models and services
+from .models import VideoJob
+from .services.pose_extraction import generate_pose_data_csv, NoPoseDataError
+from .services.pose_normalization import normalize_pose_csv
 from .task_modules.scatter import preprocess_and_scatter
 
 # Get an instance of a logger
@@ -117,8 +104,9 @@ def video_to_pose_data_task(self, job_id):
         if not pose_data_csv_content:
             logger.info(f"Job {job_id}: Generating new pose data")
             try:
-                pose_data_csv_content = pose_extraction.generate_pose_data_csv(
-                    job.input_video.file.path, job.pose_algorithm_id
+                pose_data_csv_content = generate_pose_data_csv(
+                    job.input_video.file.path,
+                    job.pose_algorithm_id,
                 )
                 reused_pose_data = False
             except NoPoseDataError as e:
@@ -141,20 +129,14 @@ def video_to_pose_data_task(self, job_id):
                 )  # Updated field name
                 job_update.status = VideoJob.JobStatus.POSE_DATA_GENERATED
                 job_update.save()  # This save will also commit the file
-            job.refresh_from_db()  # Refresh to get the saved file name
+            job.refresh_from_db()
+            # Defer triggering the next task until after the transaction commits
+            transaction.on_commit(lambda: normalize_pose_data_task.delay(job_id))
 
-            task_duration = timezone.now() - task_start_time
-            logger.info(
-                f"Job {job_id}: Task completed in {task_duration.total_seconds():.1f}s ({'reused' if reused_pose_data else 'generated'} pose data)"
-            )
-        else:
-            raise ValueError("Pose data CSV content is empty or generation failed.")
-
-        # logger.info(
-        #     f"Job {job_id}: Pose data generation successful. Triggering armature video task."
-        # )
-        # pose_data_to_armature_video_task.si(job_id).apply_async()
-
+        task_duration = timezone.now() - task_start_time
+        logger.info(
+            f"Job {job_id}: Task completed in {task_duration.total_seconds():.1f}s ({'reused' if reused_pose_data else 'generated'} pose data)"
+        )
     except VideoJob.DoesNotExist:
         logger.error(f"VideoJob with id {job_id} not found for pose extraction.")
     except Exception as e:
@@ -261,23 +243,20 @@ def pose_data_to_armature_video_task(self, job_id):
                     os.path.basename(output_video_file_path),
                     ContentFile(f.read()),
                     save=False,
-                )
-            job_complete.output_generated_at = timezone.now()
-            job_complete.status = VideoJob.JobStatus.COMPLETED
-            job_complete.save()
+                )  # Updated field name
+                job_complete.status = VideoJob.JobStatus.COMPLETED
+                job_complete.save()  # This save will also commit the file
+            job.refresh_from_db()  # Refresh to get the saved file name
 
+        task_duration = timezone.now() - task_start_time
         logger.info(
-            f"Job {job_id}: Armature video generation successful. Output at: {output_video_file_path}"
+            f"Job {job_id}: Armature video generation task completed in {task_duration.total_seconds():.1f}s"
         )
-
     except VideoJob.DoesNotExist:
-        logger.error(
-            f"VideoJob with id {job_id} not found for armature video generation."
-        )
+        logger.error(f"VideoJob with id {job_id} not found for armature video task.")
     except Exception as e:
         logger.error(
-            f"Error in pose_data_to_armature_video_task for job {job_id}: {e}",
-            exc_info=True,
+            f"Error in pose_data_to_armature_video_task for job {job_id}: {e}", exc_info=True
         )
         try:
             with transaction.atomic():
@@ -291,11 +270,57 @@ def pose_data_to_armature_video_task(self, job_id):
             )
 
 
+@shared_task(bind=True, name="video_processing.normalize_pose_data_task")
+def normalize_pose_data_task(self, job_id):
+    """
+    Celery task to normalize pose landmark CSV data by anatomical method (shoulder-scale + hip-center).
+    """
+    start = timezone.now()
+    logger.info(f"Job {job_id}: Starting pose data normalization")
+    try:
+        # Load job and mark status
+        job = VideoJob.objects.get(id=job_id)
+        with transaction.atomic():
+            uj = VideoJob.objects.select_for_update().get(id=job_id)
+            uj.status = VideoJob.JobStatus.NORMALISING_POSE_DATA
+            uj.save()
+
+        # Read original CSV bytes
+        with job.pose_data_file.open('rb') as f:
+            csv_bytes = f.read()
+        # Normalize via service
+        norm_bytes = normalize_pose_csv(csv_bytes)
+
+        # Save normalized CSV
+        fname = f"{job.id}_normposedata_v{job.pose_algorithm_id}.csv"
+        with transaction.atomic():
+            uj = VideoJob.objects.select_for_update().get(id=job_id)
+            uj.norm_pose_data_file.save(fname, ContentFile(norm_bytes), save=False)
+            uj.status = VideoJob.JobStatus.POSE_DATA_NORMALISED
+            uj.save()
+
+        elapsed = (timezone.now() - start).total_seconds()
+        logger.info(f"Job {job_id}: Normalization done in {elapsed:.1f}s")
+    except VideoJob.DoesNotExist:
+        logger.error(f"VideoJob {job_id} not found for normalization.")
+    except Exception as e:
+        logger.error(f"Normalize task error for job {job_id}: {e}", exc_info=True)
+        with transaction.atomic():
+            uj = VideoJob.objects.select_for_update().get(id=job_id)
+            uj.status = VideoJob.JobStatus.FAILED
+            uj.error_message = f"Normalization error: {e}"
+            uj.save()
+
+
 def is_gpu_available():
+    """Check if at least one GPU is available for processing."""
     return len(GPUtil.getAvailable()) > 0
 
 
 def dispatch_pose_extraction_task(job_id):
+    """
+    Dispatches the pose extraction task to GPU or CPU queue based on availability.
+    """
     if is_gpu_available():
         logger.info(f"Dispatching job {job_id} to GPU queue.")
         video_to_pose_data_task_gpu.delay(job_id)

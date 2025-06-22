@@ -145,6 +145,8 @@ class VideoJob(models.Model):
             "POSE_DATA_GENERATED",
             "Pose Data Generated, Awaiting Armature Video",
         )
+        NORMALISING_POSE_DATA = "NORMALISING_POSE_DATA", "Normalising Pose Data"
+        POSE_DATA_NORMALISED = "POSE_DATA_NORMALISED", "Pose Data Normalised"
         ARMATURE_VIDEO_QUEUED = "ARMATURE_VIDEO_QUEUED", "Armature Video Queued"
         GENERATING_ARMATURE_VIDEO = (
             "GENERATING_ARMATURE_VIDEO",

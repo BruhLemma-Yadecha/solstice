@@ -3,7 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: solstice
+    image: solstice-backend
     container_name: solstice_web
     command: gunicorn --workers 3 --bind 0.0.0.0:8000 solstice.wsgi:application
     volumes:
@@ -47,6 +47,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    image: solstice-backend
     container_name: solstice_migrate
     entrypoint: ""
     command: python manage.py migrate
@@ -60,6 +61,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    image: solstice-backend
     container_name: solstice_worker
     command: celery -A solstice worker -l info
     volumes:
@@ -75,4 +77,6 @@ services:
 
 volumes:
   postgres_data:
+    name: solstice_postgres_data
   media_volume:
+    name: solstice_media_volume

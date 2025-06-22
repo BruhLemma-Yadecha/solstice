@@ -70,6 +70,7 @@ class VideoJobDetailSerializer(serializers.ModelSerializer):
             "input_video_details",  # Nested details of the input video
             "pose_algorithm_id",
             "pose_data_file",  # URL to the generated CSV
+            "norm_pose_data_file",  # URL to the normalized CSV
             "output_video_file",  # URL to the final video
             "output_generated_at",
             "error_message",
@@ -84,6 +85,7 @@ class VideoJobDetailSerializer(serializers.ModelSerializer):
             "status_display",
             "input_video_details",
             "pose_data_file",
+            "norm_pose_data_file",
             "output_video_file",
             "output_generated_at",
             "error_message",
@@ -116,6 +118,16 @@ class VideoJobDetailSerializer(serializers.ModelSerializer):
             )
         else:
             representation["pose_data_file"] = None
+        # Normalized pose data CSV URL
+        if instance.norm_pose_data_file and hasattr(instance.norm_pose_data_file, "url"):
+            representation["norm_pose_data_file"] = (
+                request.build_absolute_uri(instance.norm_pose_data_file.url)
+                if request
+                else instance.norm_pose_data_file.url
+            )
+        else:
+            representation["norm_pose_data_file"] = None
+
         # Output video file URL
         if instance.output_video_file and hasattr(instance.output_video_file, "url"):
             representation["output_video_file"] = (
