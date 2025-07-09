@@ -38,7 +38,9 @@ def normalize_pose_frame(frame: np.ndarray) -> np.ndarray:
     return coords.flatten()
 
 
-def normalize_pose_csv(csv_bytes: bytes, required_indices: Optional[List[int]] = None) -> bytes:
+def normalize_pose_csv(
+    csv_bytes: bytes, required_indices: Optional[List[int]] = None
+) -> bytes:
     """
     Read CSV bytes of pose data, apply per-frame normalization, and return CSV bytes.
 
@@ -49,10 +51,10 @@ def normalize_pose_csv(csv_bytes: bytes, required_indices: Optional[List[int]] =
         bytes: Normalized CSV data.
     """
     # Load into DataFrame
-    text = csv_bytes.decode('utf-8')
+    text = csv_bytes.decode("utf-8")
     df = pd.read_csv(StringIO(text))
     # Only numeric columns
-    numeric = df.select_dtypes(include=['number']).columns
+    numeric = df.select_dtypes(include=["number"]).columns
     data = df[numeric].to_numpy()  # shape: (frames, n_landmarks*3)
     # Normalize each frame
     normalized = np.apply_along_axis(normalize_pose_frame, 1, data)
@@ -62,4 +64,4 @@ def normalize_pose_csv(csv_bytes: bytes, required_indices: Optional[List[int]] =
     # Output
     out_buffer = StringIO()
     df_norm.to_csv(out_buffer, index=False)
-    return out_buffer.getvalue().encode('utf-8')
+    return out_buffer.getvalue().encode("utf-8")

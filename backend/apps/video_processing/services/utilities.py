@@ -15,6 +15,7 @@ def delete_csv(csv_filepath):
         logger.error(f"Error deleting CSV file {csv_file_path}: {e}")
         return False
 
+
 def delete_norm_csv(norm_csv_filepath):
     try:
         norm_csv_file_path = norm_csv_filepath.name

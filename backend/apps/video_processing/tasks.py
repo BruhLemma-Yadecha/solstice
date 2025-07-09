@@ -152,13 +152,13 @@ def pose_data_to_armature_video_task(self, job_id):
         if (
             not job.norm_pose_data_file or not job.norm_pose_data_file.name
         ):  # Updated field name
-            logger.error(f"Job {job_id}: Intermediate normalized pose data CSV not found.")
+            logger.error(
+                f"Job {job_id}: Intermediate normalized pose data CSV not found."
+            )
             with transaction.atomic():
                 job_update = VideoJob.objects.select_for_update().get(id=job_id)
                 job_update.status = VideoJob.JobStatus.FAILED
-                job_update.error_message = (
-                    "Intermediate normalized pose data CSV missing for armature video generation."
-                )
+                job_update.error_message = "Intermediate normalized pose data CSV missing for armature video generation."
                 job_update.save()
             return
 
@@ -210,7 +210,8 @@ def pose_data_to_armature_video_task(self, job_id):
         logger.error(f"VideoJob with id {job_id} not found for armature video task.")
     except Exception as e:
         logger.error(
-            f"Error in pose_data_to_armature_video_task for job {job_id}: {e}", exc_info=True
+            f"Error in pose_data_to_armature_video_task for job {job_id}: {e}",
+            exc_info=True,
         )
         try:
             with transaction.atomic():
@@ -240,7 +241,7 @@ def normalize_pose_data_task(self, job_id):
             uj.save()
 
         # Read original CSV bytes
-        with job.pose_data_file.open('rb') as f:
+        with job.pose_data_file.open("rb") as f:
             csv_bytes = f.read()
         # Normalize via service
         norm_bytes = normalize_pose_csv(csv_bytes)

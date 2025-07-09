@@ -49,8 +49,23 @@ def _get_landmarker(model_asset_path: str):
         raise FileNotFoundError(detailed_error_msg)
 
     try:
+        # Try GPU acceleration first
+        try:
+            base_options = BaseOptions(
+                model_asset_path=model_asset_path,
+                delegate=BaseOptions.Delegate.GPU,  # Enable GPU acceleration
+            )
+            logger.info(
+                f"Attempting to initialize MediaPipe with GPU acceleration for {model_asset_path}"
+            )
+        except Exception as gpu_error:
+            logger.warning(
+                f"GPU initialization failed for {model_asset_path}, falling back to CPU: {gpu_error}"
+            )
+            base_options = BaseOptions(model_asset_path=model_asset_path)
+
         options = PoseLandmarkerOptions(
-            base_options=BaseOptions(model_asset_path=model_asset_path),
+            base_options=base_options,
             running_mode=VisionRunningMode.VIDEO,
             num_poses=1,
             min_pose_detection_confidence=0.5,

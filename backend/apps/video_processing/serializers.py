@@ -119,7 +119,9 @@ class VideoJobDetailSerializer(serializers.ModelSerializer):
         else:
             representation["pose_data_file"] = None
         # Normalized pose data CSV URL
-        if instance.norm_pose_data_file and hasattr(instance.norm_pose_data_file, "url"):
+        if instance.norm_pose_data_file and hasattr(
+            instance.norm_pose_data_file, "url"
+        ):
             representation["norm_pose_data_file"] = (
                 request.build_absolute_uri(instance.norm_pose_data_file.url)
                 if request

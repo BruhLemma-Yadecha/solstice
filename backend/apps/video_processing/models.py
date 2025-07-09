@@ -117,6 +117,7 @@ def get_output_video_upload_path(instance, filename):
     filename = f"{instance.id}_output{ext}"
     return os.path.join("deliverables", "videos", filename)
 
+
 def get_norm_pose_data_upload_path(instance, filename):
     """
     Generates a unique upload path for normalized pose data CSVs.
