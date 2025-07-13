@@ -534,7 +534,7 @@ export const Lab = () => {
                 </motion.button>
                 <motion.input
                     type="range"
-                    min={0}
+                    min={startTime}
                     max={startTime+endTime}
                     value={currentTime}
                     onChange={handleSeek}
