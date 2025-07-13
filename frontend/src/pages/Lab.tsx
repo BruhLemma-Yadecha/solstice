@@ -36,15 +36,61 @@ export const Lab = () => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const canvasRef2 = useRef<HTMLCanvasElement>(null);
 
-    // Poll /latest/ until both video1 and csv_url are available
+    // Use WebSocket for real-time updates instead of polling
     useEffect(() => {
+        let ws: WebSocket | null = null;
+        let reconnectTimeout: NodeJS.Timeout;
         let cancelled = false;
-        let pollTimeout: NodeJS.Timeout;
 
-        // Always try to get job_id from localStorage
         const jobId = localStorage.getItem("video_job_id");
 
-        const pollLatest = async () => {
+        const connectWebSocket = () => {
+            try {
+                ws = new WebSocket('ws://127.0.0.1:8001/ws/latest/');
+                
+                ws.onopen = () => {
+                    console.log('WebSocket connected to latest data');
+                };
+
+                ws.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        
+                        // Check if this is for our specific job or general latest
+                        if (!jobId || !data.job_id || data.job_id === jobId) {
+                            if (data.video1 && data.csv_url && !cancelled) {
+                                setVideoUrl(data.video1);
+                                setCsvUrl(data.csv_url);
+                                setNormCsvUrl(data.norm_csv_url);
+                                if (data.video_id) setVideoId(data.video_id);
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Error parsing WebSocket message:', error);
+                    }
+                };
+
+                ws.onclose = () => {
+                    console.log('WebSocket connection closed');
+                    if (!cancelled) {
+                        // Reconnect after 3 seconds
+                        reconnectTimeout = setTimeout(connectWebSocket, 3000);
+                    }
+                };
+
+                ws.onerror = (error) => {
+                    console.error('WebSocket error:', error);
+                };
+            } catch (error) {
+                console.error('Error creating WebSocket:', error);
+                if (!cancelled) {
+                    reconnectTimeout = setTimeout(connectWebSocket, 3000);
+                }
+            }
+        };
+
+        // Initial fallback fetch for immediate data
+        const initialFetch = async () => {
             try {
                 let url = "http://127.0.0.1:8008/video/latest/";
                 if (jobId) {
@@ -52,28 +98,29 @@ export const Lab = () => {
                 }
                 const res = await fetch(url);
                 const data = await res.json();
-                if (data.video1 && data.csv_url) {
-                    if (!cancelled) {
-                        setVideoUrl(data.video1);
-                        setCsvUrl(data.csv_url);
-                        setNormCsvUrl(data.norm_csv_url);
-                        if (data.video_id) setVideoId(data.video_id);
-                    }
-                } else {
-                    // Not ready, poll again after 5s
-                    pollTimeout = setTimeout(pollLatest, 5000);
+                if (data.video1 && data.csv_url && !cancelled) {
+                    setVideoUrl(data.video1);
+                    setCsvUrl(data.csv_url);
+                    setNormCsvUrl(data.norm_csv_url);
+                    if (data.video_id) setVideoId(data.video_id);
                 }
-            } catch {
-                // On error, poll again after 5s
-                pollTimeout = setTimeout(pollLatest, 5000);
+            } catch (error) {
+                console.error('Error fetching initial data:', error);
             }
         };
 
-        pollLatest();
+        // Start with initial fetch, then connect WebSocket
+        initialFetch();
+        connectWebSocket();
 
         return () => {
             cancelled = true;
-            if (pollTimeout) clearTimeout(pollTimeout);
+            if (ws) {
+                ws.close();
+            }
+            if (reconnectTimeout) {
+                clearTimeout(reconnectTimeout);
+            }
         };
     }, [csvReloadKey]);
 
@@ -567,91 +614,216 @@ export const Lab = () => {
                     <StatusPage />
                 </div>
             )}
-            <div style={{ display: "flex", gap: "2rem", justifyContent: "center", margin: "2rem 0" }}>
-                <motion.button
-                    className="back-button"
-                    onClick={() => navigate("/")}
-                    whileHover={{ scale: 1.05, boxShadow: "8px 8px #00bcd4", color: "#fff" }}
-                    whileTap={{ scale: 0.95, boxShadow: "4px 3px #00bcd4" }}
-                    style={{ color: "#00bcd4", backgroundColor: "transparent", border: "none", cursor: "pointer", boxShadow: "0 2px 0px #00bcd4" }}
-                >
-                    Back
-                </motion.button>
-                <motion.button
-                    className="back-button"
-                    onClick={handleDeleteVideo}
-                    whileHover={{ scale: 1.05, boxShadow: "8px 8px #00bcd4", color: "#fff" }}
-                    whileTap={{ scale: 0.95, boxShadow: "4px 3px #00bcd4" }}
-                    style={{ color: "#00bcd4", backgroundColor: "transparent", border: "none", cursor: "pointer", boxShadow: "0 2px 0px #00bcd4" }}
-                >
-                    Delete Video
-                </motion.button>
-                <motion.button
-                    className="back-button"
-                    onClick={handleReloadCSV}
-                    whileHover={{ scale: 1.05, boxShadow: "8px 8px #00bcd4", color: "#fff" }}
-                    whileTap={{ scale: 0.95, boxShadow: "4px 3px #00bcd4" }}
-                    style={{ color: "#00bcd4", backgroundColor: "transparent", border: "none", cursor: "pointer", boxShadow: "0 2px 0px #00bcd4" }}
-                >
-                    Reload CSV
-                </motion.button>
-                <motion.button
-                    className="back-button"
-                    onClick={() => window.location.reload()}
-                    whileHover={{ scale: 1.05, boxShadow: "8px 8px #00bcd4", color: "#fff" }}
-                    whileTap={{ scale: 0.95, boxShadow: "4px 3px #00bcd4" }}
-                    style={{ color: "#00bcd4", backgroundColor: "transparent", border: "none", cursor: "pointer", boxShadow: "0 2px 0px #00bcd4" }}
-                >
-                    Reload Page
-                </motion.button>
-                <motion.button
-                    className="back-button"
-                    onClick={() => setStatus(!status)}
-                    whileHover={{ scale: 1.05, boxShadow: "8px 8px #00bcd4", color: "#fff" }}
-                    whileTap={{ scale: 0.95, boxShadow: "4px 3px #00bcd4" }}
-                    style={{ color: "#00bcd4", backgroundColor: "transparent", border: "none", cursor: "pointer", boxShadow: "0 2px 0px #00bcd4" }}
-                >
-                    Status
-                </motion.button>
-                <motion.button
-                    className="back-button"
-                    onClick={setContentStartTime}
-                    whileHover={{ scale: 1.05, boxShadow: "8px 8px #ff9800", color: "#fff" }}
-                    whileTap={{ scale: 0.95, boxShadow: "4px 3px #ff9800" }}
-                    style={{ color: "#ff9800", backgroundColor: "transparent", border: "none", cursor: "pointer", boxShadow: "0 2px 0px #ff9800" }}
-                    title="Set current video time as CSV start time"
-                >
-                    Sync Start
-                </motion.button>
-                <motion.button
-                    className="back-button"
-                    onClick={resetContentStart}
-                    whileHover={{ scale: 1.05, boxShadow: "8px 8px #f44336", color: "#fff" }}
-                    whileTap={{ scale: 0.95, boxShadow: "4px 3px #f44336" }}
-                    style={{ color: "#f44336", backgroundColor: "transparent", border: "none", cursor: "pointer", boxShadow: "0 2px 0px #f44336" }}
-                    title="Reset sync and auto-detect on next playback"
-                >
-                    Reset Sync
-                </motion.button>
-                <motion.button
-                    className="back-button"
-                    onClick={() => navigate("/videos")}
-                    whileHover={{ scale: 1.05, boxShadow: "8px 8px #00bcd4" }}
-                    whileTap={{ scale: 0.95, boxShadow: "4px 3px #00bcd4" }}
-                    style={{ color: "#00bcd4", backgroundColor: "transparent", border: "none", cursor: "pointer", margin: "auto", boxShadow: "0 2px 0px #00bcd4" }}
-                >
-                    Videos
-                </motion.button>
-                <motion.button
-                    className="back-button"
-                    onClick={() => navigate("/jobs")}
-                    whileHover={{ scale: 1.05, boxShadow: "8px 8px #00bcd4" }}
-                    whileTap={{ scale: 0.95, boxShadow: "4px 3px #00bcd4" }}
-                    style={{ color: "#00bcd4", backgroundColor: "transparent", border: "none", cursor: "pointer", margin: "auto", boxShadow: "0 2px 0px #00bcd4" }}
-                >
-                    Jobs
-                </motion.button>
-            </div>
+            <motion.div
+                className="lab-button-controls"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.6, duration: 0.5 }}
+                style={{ 
+                    display: "flex", 
+                    flexDirection: "column", 
+                    gap: "1.5rem", 
+                    alignItems: "center", 
+                    margin: "2rem 0",
+                    maxWidth: "900px",
+                    marginLeft: "auto",
+                    marginRight: "auto"
+                }}
+            >
+                {/* Synchronization Controls */}
+                <div style={{ 
+                    display: "flex", 
+                    gap: "1rem", 
+                    alignItems: "center",
+                    padding: "1rem",
+                    backgroundColor: "rgba(255, 152, 0, 0.1)",
+                    borderRadius: "12px",
+                    border: "1px solid rgba(255, 152, 0, 0.3)"
+                }}>
+                    <span style={{ color: "#ff9800", fontWeight: "600", fontSize: "0.9rem" }}>Timeline Sync:</span>
+                    <motion.button
+                        className="back-button"
+                        onClick={setContentStartTime}
+                        whileHover={{ scale: 1.05, boxShadow: "6px 6px #ff9800", color: "#fff" }}
+                        whileTap={{ scale: 0.95, boxShadow: "3px 3px #ff9800" }}
+                        style={{ 
+                            color: "#ff9800", 
+                            backgroundColor: "transparent", 
+                            border: "none", 
+                            cursor: "pointer", 
+                            boxShadow: "0 2px 0px #ff9800",
+                            padding: "0.5rem 1rem",
+                            borderRadius: "8px"
+                        }}
+                        title="Set current video time as CSV start time"
+                    >
+                        Sync Start
+                    </motion.button>
+                    <motion.button
+                        className="back-button"
+                        onClick={resetContentStart}
+                        whileHover={{ scale: 1.05, boxShadow: "6px 6px #f44336", color: "#fff" }}
+                        whileTap={{ scale: 0.95, boxShadow: "3px 3px #f44336" }}
+                        style={{ 
+                            color: "#f44336", 
+                            backgroundColor: "transparent", 
+                            border: "none", 
+                            cursor: "pointer", 
+                            boxShadow: "0 2px 0px #f44336",
+                            padding: "0.5rem 1rem",
+                            borderRadius: "8px"
+                        }}
+                        title="Reset sync and auto-detect on next playback"
+                    >
+                        Reset Sync
+                    </motion.button>
+                </div>
+
+                {/* Data Controls */}
+                <div style={{ 
+                    display: "flex", 
+                    gap: "1rem", 
+                    alignItems: "center",
+                    padding: "1rem",
+                    backgroundColor: "rgba(0, 188, 212, 0.1)",
+                    borderRadius: "12px",
+                    border: "1px solid rgba(0, 188, 212, 0.3)"
+                }}>
+                    <span style={{ color: "#00bcd4", fontWeight: "600", fontSize: "0.9rem" }}>Data Controls:</span>
+                    <motion.button
+                        className="back-button"
+                        onClick={handleReloadCSV}
+                        whileHover={{ scale: 1.05, boxShadow: "6px 6px #00bcd4", color: "#fff" }}
+                        whileTap={{ scale: 0.95, boxShadow: "3px 3px #00bcd4" }}
+                        style={{ 
+                            color: "#00bcd4", 
+                            backgroundColor: "transparent", 
+                            border: "none", 
+                            cursor: "pointer", 
+                            boxShadow: "0 2px 0px #00bcd4",
+                            padding: "0.5rem 1rem",
+                            borderRadius: "8px"
+                        }}
+                    >
+                        Reload CSV
+                    </motion.button>
+                    <motion.button
+                        className="back-button"
+                        onClick={handleDeleteVideo}
+                        whileHover={{ scale: 1.05, boxShadow: "6px 6px #f44336", color: "#fff" }}
+                        whileTap={{ scale: 0.95, boxShadow: "3px 3px #f44336" }}
+                        style={{ 
+                            color: "#f44336", 
+                            backgroundColor: "transparent", 
+                            border: "none", 
+                            cursor: "pointer", 
+                            boxShadow: "0 2px 0px #f44336",
+                            padding: "0.5rem 1rem",
+                            borderRadius: "8px"
+                        }}
+                    >
+                        Delete Video
+                    </motion.button>
+                    <motion.button
+                        className="back-button"
+                        onClick={() => setStatus(!status)}
+                        whileHover={{ scale: 1.05, boxShadow: "6px 6px #00bcd4", color: "#fff" }}
+                        whileTap={{ scale: 0.95, boxShadow: "3px 3px #00bcd4" }}
+                        style={{ 
+                            color: "#00bcd4", 
+                            backgroundColor: "transparent", 
+                            border: "none", 
+                            cursor: "pointer", 
+                            boxShadow: "0 2px 0px #00bcd4",
+                            padding: "0.5rem 1rem",
+                            borderRadius: "8px"
+                        }}
+                    >
+                        Status
+                    </motion.button>
+                    <motion.button
+                        className="back-button"
+                        onClick={() => window.location.reload()}
+                        whileHover={{ scale: 1.05, boxShadow: "6px 6px #9e9e9e", color: "#fff" }}
+                        whileTap={{ scale: 0.95, boxShadow: "3px 3px #9e9e9e" }}
+                        style={{ 
+                            color: "#9e9e9e", 
+                            backgroundColor: "transparent", 
+                            border: "none", 
+                            cursor: "pointer", 
+                            boxShadow: "0 2px 0px #9e9e9e",
+                            padding: "0.5rem 1rem",
+                            borderRadius: "8px"
+                        }}
+                    >
+                        Reload Page
+                    </motion.button>
+                </div>
+
+                {/* Navigation Controls */}
+                <div style={{ 
+                    display: "flex", 
+                    gap: "1rem", 
+                    alignItems: "center",
+                    padding: "1rem",
+                    backgroundColor: "rgba(0, 188, 212, 0.1)",
+                    borderRadius: "12px",
+                    border: "1px solid rgba(0, 188, 212, 0.3)"
+                }}>
+                    <span style={{ color: "#00bcd4", fontWeight: "600", fontSize: "0.9rem" }}>Navigation:</span>
+                    <motion.button
+                        className="back-button"
+                        onClick={() => navigate("/")}
+                        whileHover={{ scale: 1.05, boxShadow: "6px 6px #00bcd4", color: "#fff" }}
+                        whileTap={{ scale: 0.95, boxShadow: "3px 3px #00bcd4" }}
+                        style={{ 
+                            color: "#00bcd4", 
+                            backgroundColor: "transparent", 
+                            border: "none", 
+                            cursor: "pointer", 
+                            boxShadow: "0 2px 0px #00bcd4",
+                            padding: "0.5rem 1rem",
+                            borderRadius: "8px"
+                        }}
+                    >
+                        Home
+                    </motion.button>
+                    <motion.button
+                        className="back-button"
+                        onClick={() => navigate("/videos")}
+                        whileHover={{ scale: 1.05, boxShadow: "6px 6px #00bcd4", color: "#fff" }}
+                        whileTap={{ scale: 0.95, boxShadow: "3px 3px #00bcd4" }}
+                        style={{ 
+                            color: "#00bcd4", 
+                            backgroundColor: "transparent", 
+                            border: "none", 
+                            cursor: "pointer", 
+                            boxShadow: "0 2px 0px #00bcd4",
+                            padding: "0.5rem 1rem",
+                            borderRadius: "8px"
+                        }}
+                    >
+                        Videos
+                    </motion.button>
+                    <motion.button
+                        className="back-button"
+                        onClick={() => navigate("/jobs")}
+                        whileHover={{ scale: 1.05, boxShadow: "6px 6px #00bcd4", color: "#fff" }}
+                        whileTap={{ scale: 0.95, boxShadow: "3px 3px #00bcd4" }}
+                        style={{ 
+                            color: "#00bcd4", 
+                            backgroundColor: "transparent", 
+                            border: "none", 
+                            cursor: "pointer", 
+                            boxShadow: "0 2px 0px #00bcd4",
+                            padding: "0.5rem 1rem",
+                            borderRadius: "8px"
+                        }}
+                    >
+                        Jobs
+                    </motion.button>
+                </div>
+            </motion.div>
         </motion.div>
     );
 };
