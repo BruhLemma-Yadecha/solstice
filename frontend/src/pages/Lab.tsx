@@ -331,6 +331,11 @@ export const Lab = () => {
             [27, 29], [29, 31], [28, 30], [30, 32],
         ];
 
+        // Scale down the normalized pose to fit better in view
+        const scale = 0.4; // Scale factor to make pose smaller
+        const offsetX = canvas.width * (1 - scale) / 2; // Center horizontally
+        const offsetY = canvas.height * (1 - scale) / 2; // Center vertically
+
         ctx.strokeStyle = "#ff9800";
         ctx.lineWidth = 2;
 
@@ -339,8 +344,8 @@ export const Lab = () => {
             const ptB = interpolatedPoints[b];
             if (ptA && ptB) {
                 ctx.beginPath();
-                ctx.moveTo(ptA.x * canvas.width, ptA.y * canvas.height);
-                ctx.lineTo(ptB.x * canvas.width, ptB.y * canvas.height);
+                ctx.moveTo(ptA.x * canvas.width * scale + offsetX, ptA.y * canvas.height * scale + offsetY);
+                ctx.lineTo(ptB.x * canvas.width * scale + offsetX, ptB.y * canvas.height * scale + offsetY);
                 ctx.stroke();
             }
         });
@@ -349,7 +354,7 @@ export const Lab = () => {
         interpolatedPoints.forEach((pt) => {
             if (pt) {
                 ctx.beginPath();
-                ctx.arc(pt.x * canvas.width, pt.y * canvas.height, 3, 0, 2 * Math.PI);
+                ctx.arc(pt.x * canvas.width * scale + offsetX, pt.y * canvas.height * scale + offsetY, 3, 0, 2 * Math.PI);
                 ctx.fill();
             }
         });
