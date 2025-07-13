@@ -50,6 +50,10 @@ def aggregate_results(self, results, job_id, workdir):
             job_update.status = VideoJob.JobStatus.POSE_DATA_GENERATED
             job_update.save()
 
+        # Trigger normalization after pose data is saved
+        from ..tasks import normalize_pose_data_task
+        transaction.on_commit(lambda: normalize_pose_data_task.delay(job_id))
+
         shutil.rmtree(workdir)
         return csv_path
     except Exception as e:

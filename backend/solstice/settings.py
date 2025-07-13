@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "channels",
     "apps.video_processing.apps.VideoProcessingConfig",
 ]
 
@@ -72,6 +73,14 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = "solstice.wsgi.application"
+ASGI_APPLICATION = "solstice.asgi.application"
+
+# Channel layer configuration
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels.layers.InMemoryChannelLayer",
+    },
+}
 
 
 # Database
@@ -194,3 +203,14 @@ CELERY_TASK_TRACK_STARTED = True  # So tasks get a 'STARTED' state
 MEDIAPIPE_MODELS_BASE_PATH = os.getenv(
     "MEDIAPIPE_MODELS_BASE_PATH", "apps/video_processing/models"
 )
+
+# File upload settings
+FILE_UPLOAD_MAX_MEMORY_SIZE = 100 * 1024 * 1024  # 100 MB in memory
+DATA_UPLOAD_MAX_MEMORY_SIZE = 100 * 1024 * 1024  # 100 MB max request size
+DATA_UPLOAD_MAX_NUMBER_FIELDS = 1000  # Increase if needed
+FILE_UPLOAD_TEMP_DIR = os.path.join(BASE_DIR, 'media', 'temp')
+
+# Create temp directory if it doesn't exist
+import os
+if not os.path.exists(FILE_UPLOAD_TEMP_DIR):
+    os.makedirs(FILE_UPLOAD_TEMP_DIR, exist_ok=True)

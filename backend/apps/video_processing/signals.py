@@ -1,8 +1,9 @@
-from django.db.models.signals import post_delete
+from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 from django.core.files.storage import default_storage
 
 from .models import Video, VideoJob
+from .websocket_utils import send_job_update, send_job_list_update, send_latest_data_update
 
 
 @receiver(post_delete, sender=Video)
@@ -34,3 +35,22 @@ def delete_job_files(sender, instance, **kwargs):
             default_storage.delete(instance.output_video_file.name)
         except Exception:
             pass
+
+
+@receiver(post_save, sender=VideoJob)
+def job_status_changed(sender, instance, created, **kwargs):
+    """
+    Send WebSocket update when a VideoJob is created or updated.
+    """
+    try:
+        send_job_update(instance.id)
+        if created:
+            send_job_list_update()
+        
+        # Send latest data update if job is completed and has CSV data
+        if instance.status == 'COMPLETED' and instance.pose_data_file:
+            send_latest_data_update()
+            
+    except Exception:
+        # Don't let WebSocket errors affect the main application
+        pass

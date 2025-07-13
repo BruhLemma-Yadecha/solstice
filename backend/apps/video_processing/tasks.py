@@ -81,9 +81,9 @@ def video_to_pose_data_task(self, job_id):
                 )
                 job_update.status = VideoJob.JobStatus.POSE_DATA_GENERATED
                 job_update.save()  # This save will also commit the file
+                # Defer triggering the next task until after the transaction commits
+                transaction.on_commit(lambda: normalize_pose_data_task.delay(job_id))
             job.refresh_from_db()
-            # Defer triggering the next task until after the transaction commits
-            transaction.on_commit(lambda: normalize_pose_data_task.delay(job_id))
 
         task_duration = timezone.now() - task_start_time
         logger.info(

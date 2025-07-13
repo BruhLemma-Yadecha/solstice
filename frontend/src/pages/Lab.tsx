@@ -20,6 +20,7 @@ export const Lab = () => {
     const [normCsvUrl, setNormCsvUrl] = useState<string>("");
     const [videoId, setVideoId] = useState<string>("");
     const [frames, setFrames] = useState<FramePoints>({});
+    const [normFrames, setNormFrames] = useState<FramePoints>({});
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentTime, setCurrentTime] = useState(0);
     const [ex, setEx] = useState(0);
@@ -28,6 +29,7 @@ export const Lab = () => {
     const [endTime, setEndTime] = useState(0);
     const [status, setStatus] = useState(false);
     const [csvReloadKey, setCsvReloadKey] = useState(0);
+    const [contentStartDetected, setContentStartDetected] = useState(false);
 
     const navigate = useNavigate();
     const videoRef = useRef<HTMLVideoElement>(null);
@@ -44,7 +46,7 @@ export const Lab = () => {
 
         const pollLatest = async () => {
             try {
-                let url = "http://127.0.0.1:8000/video/latest/";
+                let url = "http://127.0.0.1:8008/video/latest/";
                 if (jobId) {
                     url += `?job_id=${jobId}`;
                 }
@@ -98,7 +100,7 @@ export const Lab = () => {
                             }
                             grouped[frameIdx] = points;
                         });
-                        setFrames(grouped);
+                        setNormFrames(grouped);
                     }
                 });
             })
@@ -146,8 +148,25 @@ export const Lab = () => {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         const fps = 30;
-        const relativeTime = currentTime - ex;
-        if (relativeTime < 0) return;
+        
+        // Auto-detect content start: use the minimum frame number in CSV as reference
+        const frameNumbers = Object.keys(frames).map(Number).filter(n => !isNaN(n));
+        const minFrame = frameNumbers.length > 0 ? Math.min(...frameNumbers) : 0;
+        const csvStartTime = minFrame / fps; // Time in video where CSV frame 0 corresponds
+        
+        // If we have CSV data, use it to calculate the offset
+        let videoStartOffset = 0;
+        if (frameNumbers.length > 0 && !contentStartDetected && videoRef.current.currentTime > 0) {
+            // Auto-detect: assume current video time corresponds to the first available frame
+            videoStartOffset = videoRef.current.currentTime - csvStartTime;
+            setStartTime(videoStartOffset);
+            setContentStartDetected(true);
+        } else if (contentStartDetected) {
+            videoStartOffset = startTime;
+        }
+        
+        // Calculate relative time: how far into the CSV data are we?
+        const relativeTime = Math.max(0, currentTime - videoStartOffset);
         const currentFrame = relativeTime * fps;
         const prevIdx = Math.floor(currentFrame);
         const nextIdx = Math.ceil(currentFrame);
@@ -216,16 +235,28 @@ export const Lab = () => {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         const fps = 30;
-        const relativeTime = currentTime - ex;
-        if (relativeTime < 0) return;
+        
+        // Use the same synchronization logic as the first canvas
+        const frameNumbers = Object.keys(normFrames).map(Number).filter(n => !isNaN(n));
+        const minFrame = frameNumbers.length > 0 ? Math.min(...frameNumbers) : 0;
+        const csvStartTime = minFrame / fps;
+        
+        let videoStartOffset = 0;
+        if (frameNumbers.length > 0 && !contentStartDetected && videoRef.current.currentTime > 0) {
+            videoStartOffset = videoRef.current.currentTime - csvStartTime;
+        } else if (contentStartDetected) {
+            videoStartOffset = startTime;
+        }
+        
+        const relativeTime = Math.max(0, currentTime - videoStartOffset);
         const currentFrame = relativeTime * fps;
         const prevIdx = Math.floor(currentFrame);
         const nextIdx = Math.ceil(currentFrame);
         const alpha = currentFrame - prevIdx;
 
         // Use frames from normalized CSV
-        const prevPoints = frames[prevIdx] || new Array(33).fill(null);
-        const nextPoints = frames[nextIdx] || new Array(33).fill(null);
+        const prevPoints = normFrames[prevIdx] || new Array(33).fill(null);
+        const nextPoints = normFrames[nextIdx] || new Array(33).fill(null);
 
         // Interpolate between prev and next points
         const interpolatedPoints: ({ x: number; y: number } | null)[] = prevPoints.map((pt, i) => {
@@ -275,7 +306,7 @@ export const Lab = () => {
                 ctx.fill();
             }
         });
-    }, [currentTime, frames, ex, normCsvUrl]);
+    }, [currentTime, normFrames, ex, normCsvUrl]);
 
     // Play/Pause video when isPlaying or videosReady changes
     useEffect(() => {
@@ -350,7 +381,7 @@ export const Lab = () => {
             return;
         }
         const jobId = localStorage.getItem("video_job_id");
-        let url = `http://127.0.0.1:8000/video/videos/${videoId}/delete/`;
+        let url = `http://127.0.0.1:8008/video/videos/${videoId}/delete/`;
         if (jobId) {
             url += `?job_id=${jobId}`;
         }
@@ -380,7 +411,7 @@ export const Lab = () => {
             return;
         }
         const jobId = localStorage.getItem("video_job_id");
-        let url = `http://127.0.0.1:8000/video/videos/${videoId}/regenerate-csv/`;
+        let url = `http://127.0.0.1:8008/video/videos/${videoId}/regenerate-csv/`;
         if (jobId) {
             url += `?job_id=${jobId}`;
         }
@@ -401,6 +432,25 @@ export const Lab = () => {
             .catch((error) => {
                 alert("Error regenerating CSV: " + error);
             });
+    };
+
+    // Manual content start time setter
+    const setContentStartTime = () => {
+        if (videoRef.current) {
+            const currentVideoTime = videoRef.current.currentTime;
+            setStartTime(currentVideoTime);
+            setContentStartDetected(true);
+            console.log(`Content start manually set to ${currentVideoTime.toFixed(2)}s`);
+            alert(`Content start time set to ${Math.floor(currentVideoTime / 60)}:${(currentVideoTime % 60).toFixed(0).padStart(2, '0')}`);
+        }
+    };
+
+    // Reset content start detection
+    const resetContentStart = () => {
+        setStartTime(0);
+        setContentStartDetected(false);
+        console.log('Content start reset');
+        alert('Content start time reset - will auto-detect on next playback');
     };
 
     return (
@@ -484,8 +534,8 @@ export const Lab = () => {
                 </motion.button>
                 <motion.input
                     type="range"
-                    min={startTime}
-                    max={endTime}
+                    min={0}
+                    max={startTime+endTime}
                     value={currentTime}
                     onChange={handleSeek}
                     step={0.01}
@@ -508,7 +558,7 @@ export const Lab = () => {
                     animate={{ opacity: 1 }}
                     transition={{ delay: 0.7 }}
                 >
-                    {formatTime(currentTime)} / {formatTime(endTime)}
+                    {formatTime(currentTime)} / {formatTime(startTime+endTime)}
                 </motion.span>
             </motion.div>
             {status && (
@@ -562,6 +612,26 @@ export const Lab = () => {
                     style={{ color: "#00bcd4", backgroundColor: "transparent", border: "none", cursor: "pointer", boxShadow: "0 2px 0px #00bcd4" }}
                 >
                     Status
+                </motion.button>
+                <motion.button
+                    className="back-button"
+                    onClick={setContentStartTime}
+                    whileHover={{ scale: 1.05, boxShadow: "8px 8px #ff9800", color: "#fff" }}
+                    whileTap={{ scale: 0.95, boxShadow: "4px 3px #ff9800" }}
+                    style={{ color: "#ff9800", backgroundColor: "transparent", border: "none", cursor: "pointer", boxShadow: "0 2px 0px #ff9800" }}
+                    title="Set current video time as CSV start time"
+                >
+                    Sync Start
+                </motion.button>
+                <motion.button
+                    className="back-button"
+                    onClick={resetContentStart}
+                    whileHover={{ scale: 1.05, boxShadow: "8px 8px #f44336", color: "#fff" }}
+                    whileTap={{ scale: 0.95, boxShadow: "4px 3px #f44336" }}
+                    style={{ color: "#f44336", backgroundColor: "transparent", border: "none", cursor: "pointer", boxShadow: "0 2px 0px #f44336" }}
+                    title="Reset sync and auto-detect on next playback"
+                >
+                    Reset Sync
                 </motion.button>
                 <motion.button
                     className="back-button"

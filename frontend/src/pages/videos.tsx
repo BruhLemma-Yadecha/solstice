@@ -15,7 +15,7 @@ const ListVideo = () => {
 
   useEffect(() => {
     // Fetch the list of videos from your Django API endpoint
-    fetch("http://127.0.0.1:8000/video/videos/")
+    fetch("http://127.0.0.1:8008/video/videos/")
       .then(res => res.json())
       .then(data => {
         // data should be an array of video objects with .file and .id
@@ -46,7 +46,7 @@ const ListVideo = () => {
     formData.append("pose_algorithm_id", "1"); // or let user choose
 
     // Upload to backend
-    const uploadRes = await fetch("http://127.0.0.1:8000/video/upload/", {
+    const uploadRes = await fetch("http://127.0.0.1:8008/video/upload/", {
       method: "POST",
       body: formData,
     });

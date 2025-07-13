@@ -18,7 +18,7 @@ const StatusPage = () => {
     }
 
     const fetchStatus = () => {
-      fetch(`http://127.0.0.1:8000/video/jobs/${storedJobId}/status/`)
+      fetch(`http://127.0.0.1:8008/video/jobs/${storedJobId}/status/`)
         .then(res => res.json())
         .then(data => {
           setStatus(data.status || JSON.stringify(data));
