@@ -7,6 +7,7 @@ from .views import (
     VideoRegenerateCSVAPIView,
     VideoListAPIView,
     JobListAPIView,
+    JobDeleteAPIView,
 )
 
 app_name = "video_processing"
@@ -14,6 +15,7 @@ app_name = "video_processing"
 urlpatterns = [
     path("upload/", VideoUploadAPIView.as_view(), name="video_upload"),
     path("jobs/<uuid:job_id>/status/", JobStatusAPIView.as_view(), name="job_status"),
+    path("jobs/<uuid:job_id>/delete/", JobDeleteAPIView.as_view(), name="job_delete"),
     path("latest/", LatestVideoAndCSVAPIView.as_view(), name="latest_video_and_csv"),
     path(
         "videos/<uuid:video_id>/delete/",

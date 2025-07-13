@@ -221,6 +221,10 @@ const JobList: React.FC = () => {
                                 </td>
                                 <td style={{ padding: 8, display: "flex", alignItems: "center", gap: 8 }}>
                                     <OpenInLabButton job={job} />
+                                    <DeleteJobButton job={job} onJobDeleted={() => {
+                                        // Remove the job from the local state
+                                        setJobs(prevJobs => prevJobs.filter(j => j.id !== job.id));
+                                    }} />
                                 </td>
                             </tr>
                         ))}
@@ -269,6 +273,61 @@ const OpenInLabButton: React.FC<{ job: Job }> = ({ job }) => {
             title={job.pose_data_file ? "Open in Lab" : "CSV not ready"}
         >
             <h3>{job.pose_data_file ? "Open in Lab" : "CSV not ready"}</h3>
+        </button>
+    );
+};
+
+const DeleteJobButton: React.FC<{ job: Job; onJobDeleted: () => void }> = ({ job, onJobDeleted }) => {
+    const [isDeleting, setIsDeleting] = useState(false);
+
+    const handleDelete = async () => {
+        if (!confirm(`Are you sure you want to delete job ${job.id}? This action cannot be undone.`)) {
+            return;
+        }
+
+        setIsDeleting(true);
+        try {
+            const response = await fetch(`http://127.0.0.1:8008/video/jobs/${job.id}/delete/`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            });
+
+            if (response.ok) {
+                onJobDeleted();
+                // Optional: Show success message
+                alert('Job deleted successfully');
+            } else {
+                throw new Error('Failed to delete job');
+            }
+        } catch (error) {
+            console.error('Error deleting job:', error);
+            alert('Error deleting job. Please try again.');
+        } finally {
+            setIsDeleting(false);
+        }
+    };
+
+    return (
+        <button
+            onClick={handleDelete}
+            disabled={isDeleting}
+            style={{
+                background: "#f44336",
+                color: "#fff",
+                border: "none",
+                borderRadius: 4,
+                padding: "4px 10px",
+                cursor: isDeleting ? "not-allowed" : "pointer",
+                fontSize: 12,
+                opacity: isDeleting ? 0.6 : 1,
+                width: 80,
+                textAlign: "center",
+            }}
+            title="Delete this job and its data"
+        >
+            {isDeleting ? "Deleting..." : "Delete"}
         </button>
     );
 };

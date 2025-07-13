@@ -475,3 +475,45 @@ class JobListAPIView(APIView):
                 }
             )
         return Response(data, status=status.HTTP_200_OK)
+
+
+class JobDeleteAPIView(APIView):
+    """
+    API View to delete a specific job and its associated data.
+    If this is the last job for a video, the video file will also be deleted.
+    """
+
+    def delete(self, request, job_id, *args, **kwargs):
+        try:
+            video_job = VideoJob.objects.get(id=job_id)
+        except VideoJob.DoesNotExist:
+            logger.warning(f"Delete request for non-existent job_id: {job_id}")
+            return Response(
+                {"detail": "Job not found."}, status=status.HTTP_404_NOT_FOUND
+            )
+
+        video = video_job.input_video
+        
+        # Delete CSV files
+        if video_job.pose_data_file:
+            delete_csv(video_job.pose_data_file)
+        if video_job.norm_pose_data_file:
+            delete_norm_csv(video_job.norm_pose_data_file)
+        
+        # Delete the job from database
+        video_job.delete()
+        logger.info(f"Deleted job {job_id} and its associated data")
+        
+        # If no more jobs exist for this video, delete the video file as well
+        if not VideoJob.objects.filter(input_video=video).exists():
+            video.delete()
+            logger.info(f"Video {video.id} deleted as it had no more jobs")
+            return Response(
+                {"detail": "Job deleted successfully. Video was also deleted as it had no more jobs."},
+                status=status.HTTP_204_NO_CONTENT,
+            )
+        
+        return Response(
+            {"detail": "Job and associated data deleted successfully."},
+            status=status.HTTP_204_NO_CONTENT,
+        )

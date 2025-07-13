@@ -12,46 +12,52 @@ RIGHT_HIP_IDX = 24
 
 def normalize_pose_frame(frame: np.ndarray) -> np.ndarray:
     """
-    Normalize a single frame of pose data (flattened x,y,z coords) by:
-     1. Scaling by shoulder distance (unit shoulder width).
-     2. Translating so hip midpoint is at origin.
-     3. Rescaling to 0-1 range for visualization.
+    Normalize a single frame of pose data by centering the person in the frame
+    and scaling to a consistent size based on shoulder width.
+    This makes poses comparable across different people and distances.
 
     Args:
         frame: 1D numpy array of length (n_landmarks*3).
     Returns:
-        1D numpy array of same shape with normalized coords in 0-1 range.
+        1D numpy array of same shape with normalized coords centered and scaled.
     """
-    # Reshape into (n_landmarks, 3)
+    # Reshape into (n_landmarks, 3) - (x, y, z)
     coords = frame.reshape(-1, 3)
     
-    # Step 1: Compute scale (shoulder distance)
-    left_sh = coords[LEFT_SHOULDER_IDX]
-    right_sh = coords[RIGHT_SHOULDER_IDX]
-    scale = np.linalg.norm(left_sh - right_sh)
-    if scale == 0:
-        scale = 1.0
-    coords = coords / scale
+    # Step 1: Calculate scale factor based on shoulder width
+    left_shoulder = coords[LEFT_SHOULDER_IDX]
+    right_shoulder = coords[RIGHT_SHOULDER_IDX]
+    shoulder_distance = np.linalg.norm(left_shoulder[:2] - right_shoulder[:2])  # Only x,y for distance
     
-    # Step 2: Center at hip midpoint
+    # Target shoulder width (normalized size)
+    target_shoulder_width = 0.25  # About 1/4 of frame width
+    
+    # Calculate scale factor (avoid division by zero)
+    if shoulder_distance > 0:
+        scale_factor = target_shoulder_width / shoulder_distance
+    else:
+        scale_factor = 1.0
+    
+    # Apply scaling to x,y coordinates only
+    coords[:, :2] = coords[:, :2] * scale_factor
+    
+    # Step 2: Calculate the center point using hip midpoint (after scaling)
     left_hip = coords[LEFT_HIP_IDX]
     right_hip = coords[RIGHT_HIP_IDX]
-    center = (left_hip + right_hip) / 2
-    coords = coords - center
+    current_center = (left_hip + right_hip) / 2
     
-    # Step 3: Rescale to 0-1 range for visualization
-    # Find the bounding box of all landmarks
-    min_coords = np.min(coords, axis=0)
-    max_coords = np.max(coords, axis=0)
+    # Target center is (0.5, 0.5) for x,y coordinates (center of frame)
+    target_center = np.array([0.5, 0.5, current_center[2]])  # Keep original z
     
-    # Calculate range for each dimension
-    coord_range = max_coords - min_coords
+    # Calculate translation needed
+    translation = target_center - current_center
     
-    # Avoid division by zero
-    coord_range = np.where(coord_range == 0, 1.0, coord_range)
+    # Apply translation to all landmarks
+    coords = coords + translation
     
-    # Normalize to 0-1 range
-    coords = (coords - min_coords) / coord_range
+    # Ensure coordinates stay within reasonable bounds [0, 1]
+    # Allow some margin outside frame for larger poses
+    coords[:, :2] = np.clip(coords[:, :2], -0.3, 1.3)
     
     return coords.flatten()
 

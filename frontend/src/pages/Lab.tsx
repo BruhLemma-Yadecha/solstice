@@ -557,7 +557,7 @@ export const Lab = () => {
                         initial={{ opacity: 0, y: 30 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.4, duration: 0.5 }}
-                        whileHover={{ scale: 1.03, boxShadow: "0 4px 32px #ff9800" }}
+                        whileHover={{ scale: 1.03, boxShadow: "0 4px 32px #00bcd4" }}
                         width={300}
                         height={225}
                         style={{ background: "#222", borderRadius: "1rem" }}
