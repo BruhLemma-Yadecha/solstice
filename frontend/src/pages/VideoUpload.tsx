@@ -29,7 +29,7 @@ const VideoUpload = () => {
     formData.append("video_file", video);
     formData.append("pose_algorithm_id", "1");
 
-    const response = await fetch("http://127.0.0.1:8000/video/upload/", {
+    const response = await fetch("http://127.0.0.1:8008/video/upload/", {
       method: "POST",
       body: formData,
     });

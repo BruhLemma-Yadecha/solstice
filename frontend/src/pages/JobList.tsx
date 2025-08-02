@@ -1,12 +1,15 @@
 import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
+import "../css/status.css";
 
 type Job = {
     id: string;
     status: string;
     created_at: string;
     pose_data_file?: string | null;
+    norm_pose_data_file?: string | null;
+    error_message?: string;
     input_video: {
         id: string;
         file: string;
@@ -16,6 +19,9 @@ type Job = {
 const statusColors: Record<string, string> = {
     UPLOADED: "#bdbdbd",
     PROCESSING: "#ff9800",
+    POSE_DATA_GENERATED: "#2196f3",
+    NORMALISING_POSE_DATA: "#9c27b0",
+    POSE_DATA_NORMALISED: "#00bcd4",
     COMPLETED: "#4caf50",
     FAILED: "#f44336",
 };
@@ -23,15 +29,56 @@ const statusColors: Record<string, string> = {
 const JobList: React.FC = () => {
     const [jobs, setJobs] = useState<Job[]>([]);
     const [loading, setLoading] = useState(true);
+    const [wsConnected, setWsConnected] = useState(false);
 
     useEffect(() => {
-        fetch("http://127.0.0.1:8000/video/jobs/")
+        // Initial fetch
+        fetch("http://127.0.0.1:8008/video/jobs/")
             .then(res => res.json())
             .then(data => {
                 setJobs(data);
                 setLoading(false);
             })
             .catch(() => setLoading(false));
+
+        // Setup WebSocket connection
+        const ws = new WebSocket('ws://127.0.0.1:8001/ws/jobs/');
+        
+        ws.onopen = () => {
+            console.log('WebSocket connected');
+            setWsConnected(true);
+        };
+        
+        ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            
+            if (data.type === 'job_list') {
+                // Complete job list update
+                setJobs(data.jobs);
+            } else if (data.type === 'job_update') {
+                // Single job update
+                setJobs(prevJobs => 
+                    prevJobs.map(job => 
+                        job.id === data.job.id ? data.job : job
+                    )
+                );
+            }
+        };
+        
+        ws.onclose = () => {
+            console.log('WebSocket disconnected');
+            setWsConnected(false);
+        };
+        
+        ws.onerror = (error) => {
+            console.error('WebSocket error:', error);
+            setWsConnected(false);
+        };
+
+        // Cleanup on component unmount
+        return () => {
+            ws.close();
+        };
     }, []);
 
     return (
@@ -43,7 +90,28 @@ const JobList: React.FC = () => {
             style={{ maxWidth: 1200, margin: "2rem auto", background: "#181c24", borderRadius: 16, padding: 32 }}
         >
             <div style={{ display: "flex", gap: "2rem", justifyContent: "space-between", alignItems: "center", margin: "1.5rem 0" }}>
-                <h2 style={{ color: "#00bcd4", margin: 0 }}>Job List</h2>
+                <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+                    <h2 style={{ color: "#00bcd4", margin: 0 }}>Job List</h2>
+                    <div style={{ 
+                        display: "flex", 
+                        alignItems: "center", 
+                        gap: "0.5rem",
+                        padding: "4px 8px",
+                        borderRadius: "12px",
+                        backgroundColor: wsConnected ? "#4caf50" : "#f44336",
+                        fontSize: "12px",
+                        color: "#fff"
+                    }}>
+                        <div style={{ 
+                            width: "8px", 
+                            height: "8px", 
+                            borderRadius: "50%", 
+                            backgroundColor: "#fff",
+                            animation: wsConnected ? "pulse 2s infinite" : "none"
+                        }}></div>
+                        {wsConnected ? "Live" : "Offline"}
+                    </div>
+                </div>
                 <div style={{ display: "flex", gap: "1rem" }}>
                     <LabNavButtons />
                 </div>
@@ -58,7 +126,9 @@ const JobList: React.FC = () => {
                             <th style={{ textAlign: "left", padding: 8 }}>Video</th>
                             <th style={{ textAlign: "left", padding: 8 }}>Status</th>
                             <th style={{ textAlign: "left", padding: 8 }}>Created</th>
-                            <th style={{ textAlign: "left", padding: 8 }}>CSV</th>
+                            <th style={{ textAlign: "left", padding: 8 }}>Raw CSV</th>
+                            <th style={{ textAlign: "left", padding: 8 }}>Norm CSV</th>
+                            <th style={{ textAlign: "left", padding: 8 }}>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -107,24 +177,54 @@ const JobList: React.FC = () => {
                                     </div>
                                 </td>
                                 <td style={{ padding: 8 }}>
-                                    <span style={{
-                                        color: statusColors[job.status] || "#fff",
-                                        fontWeight: 600,
-                                        letterSpacing: 1,
-                                    }}>
-                                        {job.status}
-                                    </span>
+                                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                                        <span style={{
+                                            color: statusColors[job.status] || "#fff",
+                                            fontWeight: 600,
+                                            letterSpacing: 1,
+                                        }}>
+                                            {job.status}
+                                        </span>
+                                        {job.error_message && (
+                                            <span style={{ 
+                                                color: "#f44336", 
+                                                fontSize: 11, 
+                                                fontStyle: "italic",
+                                                maxWidth: 200,
+                                                overflow: "hidden",
+                                                textOverflow: "ellipsis",
+                                                whiteSpace: "nowrap"
+                                            }} title={job.error_message}>
+                                                Error: {job.error_message}
+                                            </span>
+                                        )}
+                                    </div>
                                 </td>
                                 <td style={{ padding: 8, fontSize: 13 }}>{new Date(job.created_at).toLocaleString()}</td>
-                                <td style={{ padding: 8, display: "flex", alignItems: "center", gap: 8 }}>
+                                <td style={{ padding: 8 }}>
                                     {job.pose_data_file ? (
-                                        <a href={job.pose_data_file} target="_blank" rel="noopener noreferrer" style={{ color: "#4caf50" }}>
-                                            Download CSV
+                                        <a href={job.pose_data_file} target="_blank" rel="noopener noreferrer" style={{ color: "#4caf50", fontSize: 12 }}>
+                                            Download
                                         </a>
                                     ) : (
-                                        <span style={{ color: "#bdbdbd" }}>Not ready</span>
+                                        <span style={{ color: "#bdbdbd", fontSize: 12 }}>Not ready</span>
                                     )}
+                                </td>
+                                <td style={{ padding: 8 }}>
+                                    {job.norm_pose_data_file ? (
+                                        <a href={job.norm_pose_data_file} target="_blank" rel="noopener noreferrer" style={{ color: "#00bcd4", fontSize: 12 }}>
+                                            Download
+                                        </a>
+                                    ) : (
+                                        <span style={{ color: "#bdbdbd", fontSize: 12 }}>Not ready</span>
+                                    )}
+                                </td>
+                                <td style={{ padding: 8, display: "flex", alignItems: "center", gap: 8 }}>
                                     <OpenInLabButton job={job} />
+                                    <DeleteJobButton job={job} onJobDeleted={() => {
+                                        // Remove the job from the local state
+                                        setJobs(prevJobs => prevJobs.filter(j => j.id !== job.id));
+                                    }} />
                                 </td>
                             </tr>
                         ))}
@@ -145,6 +245,11 @@ const OpenInLabButton: React.FC<{ job: Job }> = ({ job }) => {
             localStorage.setItem("csv_url", job.pose_data_file);
         } else {
             localStorage.removeItem("csv_url");
+        }
+        if (job.norm_pose_data_file) {
+            localStorage.setItem("norm_csv_url", job.norm_pose_data_file);
+        } else {
+            localStorage.removeItem("norm_csv_url");
         }
         navigate("/lab");
     };
@@ -168,6 +273,61 @@ const OpenInLabButton: React.FC<{ job: Job }> = ({ job }) => {
             title={job.pose_data_file ? "Open in Lab" : "CSV not ready"}
         >
             <h3>{job.pose_data_file ? "Open in Lab" : "CSV not ready"}</h3>
+        </button>
+    );
+};
+
+const DeleteJobButton: React.FC<{ job: Job; onJobDeleted: () => void }> = ({ job, onJobDeleted }) => {
+    const [isDeleting, setIsDeleting] = useState(false);
+
+    const handleDelete = async () => {
+        if (!confirm(`Are you sure you want to delete job ${job.id}? This action cannot be undone.`)) {
+            return;
+        }
+
+        setIsDeleting(true);
+        try {
+            const response = await fetch(`http://127.0.0.1:8008/video/jobs/${job.id}/delete/`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            });
+
+            if (response.ok) {
+                onJobDeleted();
+                // Optional: Show success message
+                alert('Job deleted successfully');
+            } else {
+                throw new Error('Failed to delete job');
+            }
+        } catch (error) {
+            console.error('Error deleting job:', error);
+            alert('Error deleting job. Please try again.');
+        } finally {
+            setIsDeleting(false);
+        }
+    };
+
+    return (
+        <button
+            onClick={handleDelete}
+            disabled={isDeleting}
+            style={{
+                background: "#f44336",
+                color: "#fff",
+                border: "none",
+                borderRadius: 4,
+                padding: "4px 10px",
+                cursor: isDeleting ? "not-allowed" : "pointer",
+                fontSize: 12,
+                opacity: isDeleting ? 0.6 : 1,
+                width: 80,
+                textAlign: "center",
+            }}
+            title="Delete this job and its data"
+        >
+            {isDeleting ? "Deleting..." : "Delete"}
         </button>
     );
 };

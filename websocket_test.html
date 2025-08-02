@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebSocket Test</title>
+</head>
+<body>
+    <h1>WebSocket Test for Solstice</h1>
+    <div id="status">Connecting...</div>
+    <div id="messages"></div>
+    <button onclick="testWebSocket()">Connect to WebSocket</button>
+
+    <script>
+        function testWebSocket() {
+            const statusDiv = document.getElementById('status');
+            const messagesDiv = document.getElementById('messages');
+            
+            statusDiv.innerHTML = 'Connecting to WebSocket...';
+            
+            const ws = new WebSocket('ws://127.0.0.1:8001/ws/jobs/');
+            
+            ws.onopen = function() {
+                statusDiv.innerHTML = '<span style="color: green;">✅ Connected to WebSocket!</span>';
+                messagesDiv.innerHTML += '<p>Connection established</p>';
+            };
+            
+            ws.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                messagesDiv.innerHTML += `<p><strong>Message received:</strong> ${JSON.stringify(data, null, 2)}</p>`;
+            };
+            
+            ws.onclose = function() {
+                statusDiv.innerHTML = '<span style="color: orange;">⚠️ WebSocket disconnected</span>';
+                messagesDiv.innerHTML += '<p>Connection closed</p>';
+            };
+            
+            ws.onerror = function(error) {
+                statusDiv.innerHTML = '<span style="color: red;">❌ WebSocket error</span>';
+                messagesDiv.innerHTML += `<p>Error: ${error}</p>`;
+            };
+        }
+        
+        // Auto-connect when page loads
+        window.onload = testWebSocket;
+    </script>
+</body>
+</html>
