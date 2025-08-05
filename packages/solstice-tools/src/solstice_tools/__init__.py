@@ -2,7 +2,6 @@
 
 __version__ = "0.1.0"
 
-# Export main functions for easy importing
 from .pose.normalization import (
     normalize_pose_frame,
     normalize_pose_csv_data,
