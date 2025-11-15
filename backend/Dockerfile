@@ -1,4 +1,3 @@
-# --- Stage 1: The Builder ---
 FROM python:3.12-slim AS builder
 
 ENV PYTHONDONTWRITEBYTECODE 1
@@ -7,7 +6,7 @@ ENV PYTHONUNBUFFERED 1
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libpq-dev \
-    libgl1-mesa-glx \
+    libgl1 \
     libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
@@ -25,7 +24,7 @@ RUN addgroup --system app && adduser --system --group app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq-dev \
-    libgl1-mesa-glx \
+    libgl1 \
     libglib2.0-0 \
     ffmpeg \
     && rm -rf /var/lib/apt/lists/*
